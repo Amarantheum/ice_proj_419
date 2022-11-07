@@ -1,9 +1,9 @@
 {
 	"name" : "Ice",
 	"version" : 1,
-	"creationdate" : 3750620814,
-	"modificationdate" : 3750613839,
-	"viewrect" : [ 25.0, 107.0, 300.0, 500.0 ],
+	"creationdate" : 3750614287,
+	"modificationdate" : 3750614287,
+	"viewrect" : [ 0.0, 0.0, 300.0, 500.0 ],
 	"autoorganize" : 1,
 	"hideprojectwindow" : 0,
 	"showdependencies" : 1,
@@ -12,7 +12,8 @@
 		"patchers" : 		{
 			"Ice.maxpat" : 			{
 				"kind" : "patcher",
-				"local" : 1
+				"local" : 1,
+				"toplevel" : 1
 			}
 
 		}
