@@ -3,16 +3,24 @@ use super::node::Node;
 pub struct Edge<'a> {
     /// implicit stress in the edge
     pub imp_stress: f32,
-    nodes: [&'a Node<'a>; 2],
-    pub valid: bool,
+    pub nodes: [&'a Node<'a>; 2],
+    pub(super) valid: bool,
+
+    row: usize,
+    col: usize,
+    ty: usize,
 }
 
 impl<'a> Edge<'a> {
-    pub fn new(imp_stress: f32, n1: &'a Node<'a>, s1: usize, n2: &'a Node<'a>, s2: usize, loc: *const Edge) -> Self {
+    pub(super) fn new(imp_stress: f32, n1: &'a Node<'a>, s1: usize, n2: &'a Node<'a>, s2: usize, loc: *const Edge, row: usize, col: usize, ty: usize) -> Self {
+        debug_assert!(ty < 3);
         let out = Self {
             imp_stress,
             nodes: [n1, n2],
             valid: true,
+            row,
+            col,
+            ty,
         };
         unsafe {
             n1.get_mut_edges()[s1] = Some(&*loc);
@@ -21,7 +29,8 @@ impl<'a> Edge<'a> {
         out
     }
 
-    pub unsafe fn null() -> Self {
+    #[allow(invalid_value)]
+    pub(super) unsafe fn null() -> Self {
         let mut out: Self = std::mem::MaybeUninit::uninit().assume_init();
         out.valid = false;
         out

@@ -1,5 +1,9 @@
-use super::node::Node;
-use super::edge::Edge;
+use node::Node;
+use edge::Edge;
+
+pub mod node;
+pub mod edge;
+mod stress_vec;
 
 /// Graph of stress nodes
 /// Top left corner starts like:
@@ -50,7 +54,7 @@ impl<'a> Graph<'a> {
     unsafe fn init<'b>(rows: usize, cols: usize, node_matrix: *mut [Node<'b>], edge_matrix: *mut [[Edge<'b>; 3]]) {
         // initialize node matrix
         for i in 0..(rows * cols) {
-            (*node_matrix)[i] = Node::new(Self::get_init_implicit_node_stress());
+            (*node_matrix)[i] = Node::new(Self::get_init_implicit_node_stress(), i / cols, i % cols);
         }
 
         let get_node = |x: usize, y: usize| -> &Node {
@@ -62,7 +66,7 @@ impl<'a> Graph<'a> {
                 // fill in horizontal edges for this row
                 if x < cols - 1 {
                     // if we aren't on the last col, link this node to the node adjacent to the right
-                    (*edge_matrix)[y * cols + x][0] = Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 0, get_node(x + 1, y), 3, &(*edge_matrix)[y * cols + x][0]);
+                    (*edge_matrix)[y * cols + x][0] = Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 0, get_node(x + 1, y), 3, &(*edge_matrix)[y * cols + x][0], y, x, 0);
                 } else {
                     (*edge_matrix)[y * cols + x][0] = Edge::null();
                 }
@@ -72,15 +76,15 @@ impl<'a> Graph<'a> {
                     if y % 2 != 1 {
                         // if we're on an even row (including row 0)
                         if x > 0 {
-                            (*edge_matrix)[y * cols + x][1] = Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 4, get_node(x - 1, y + 1), 1, &(*edge_matrix)[y * cols + x][1]);
+                            (*edge_matrix)[y * cols + x][1] = Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 4, get_node(x - 1, y + 1), 1, &(*edge_matrix)[y * cols + x][1], y, x, 1);
                         } else {
                             (*edge_matrix)[y * cols + x][1] = Edge::null();
                         }
-                        (*edge_matrix)[y * cols + x][2] = Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 5, get_node(x, y + 1), 2, &(*edge_matrix)[y * cols + x][2]);
+                        (*edge_matrix)[y * cols + x][2] = Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 5, get_node(x, y + 1), 2, &(*edge_matrix)[y * cols + x][2], y, x, 2);
                     } else {
-                        (*edge_matrix)[y * cols + x][1] = Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 4, get_node(x, y + 1), 1, &(*edge_matrix)[y * cols + x][1]);
+                        (*edge_matrix)[y * cols + x][1] = Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 4, get_node(x, y + 1), 1, &(*edge_matrix)[y * cols + x][1], y, x, 1);
                         if x < cols - 1 {
-                            (*edge_matrix)[y * cols + x][2] = Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 5, get_node(x + 1, y + 1), 2, &(*edge_matrix)[y * cols + x][2]);
+                            (*edge_matrix)[y * cols + x][2] = Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 5, get_node(x + 1, y + 1), 2, &(*edge_matrix)[y * cols + x][2], y, x, 2);
                         } else {
                             (*edge_matrix)[y * cols + x][2] = Edge::null();
                         }
@@ -127,7 +131,7 @@ impl<'a> Graph<'a> {
 
     fn get_init_implicit_node_stress() -> f32 {
         // TODO randomize here?
-        2_f32
+        0_f32
     }
 
     fn get_init_implicit_edge_stress() -> f32 {
@@ -143,11 +147,11 @@ mod tests {
 
     #[test]
     fn test_random_traverse() {
-        let mut g = Graph::new(1000, 1000);
+        let g = Graph::new(1000, 1000);
 
         let mut cur_node = g.get_node(0, 0);
 
-        for i in 0..100000 {
+        for _ in 0..100000 {
             let mut n = random::<usize>() % 6;
             loop {
                 if let Some(v) = cur_node.get_adjacent_node_n(n) {
