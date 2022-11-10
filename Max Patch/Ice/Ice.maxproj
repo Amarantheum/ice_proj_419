@@ -2,8 +2,8 @@
 	"name" : "Ice",
 	"version" : 1,
 	"creationdate" : 3750614287,
-	"modificationdate" : 3750614287,
-	"viewrect" : [ 0.0, 0.0, 300.0, 500.0 ],
+	"modificationdate" : 3750937182,
+	"viewrect" : [ 25.0, 107.0, 300.0, 500.0 ],
 	"autoorganize" : 1,
 	"hideprojectwindow" : 0,
 	"showdependencies" : 1,
@@ -14,6 +14,14 @@
 				"kind" : "patcher",
 				"local" : 1,
 				"toplevel" : 1
+			}
+
+		}
+,
+		"code" : 		{
+			"chords.js" : 			{
+				"kind" : "javascript",
+				"local" : 1
 			}
 
 		}

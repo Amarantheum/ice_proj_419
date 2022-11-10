@@ -10,7 +10,7 @@
 		}
 ,
 		"classnamespace" : "box",
-		"rect" : [ 195.0, 154.0, 746.0, 548.0 ],
+		"rect" : [ 436.0, 251.0, 1047.0, 548.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -39,6 +39,71 @@
 		"subpatcher_template" : "",
 		"assistshowspatchername" : 0,
 		"boxes" : [ 			{
+				"box" : 				{
+					"id" : "obj-16",
+					"maxclass" : "message",
+					"numinlets" : 2,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 302.0, 324.0, 32.0, 22.0 ],
+					"text" : "0.25"
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-11",
+					"maxclass" : "newobj",
+					"numinlets" : 2,
+					"numoutlets" : 1,
+					"outlettype" : [ "bang" ],
+					"patching_rect" : [ 344.0, 279.0, 61.0, 22.0 ],
+					"text" : "delay 100"
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-17",
+					"maxclass" : "message",
+					"numinlets" : 2,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 539.0, 361.0, 385.0, 22.0 ],
+					"text" : "440 0.5 0.5 660 0.5 0.5 1650 0.5 1.5 2200 0.5 1.4 990 0.5 1.3"
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-15",
+					"maxclass" : "button",
+					"numinlets" : 1,
+					"numoutlets" : 1,
+					"outlettype" : [ "bang" ],
+					"parameter_enable" : 0,
+					"patching_rect" : [ 545.0, 244.0, 24.0, 24.0 ]
+				}
+
+			}
+, 			{
+				"box" : 				{
+					"id" : "obj-8",
+					"maxclass" : "newobj",
+					"numinlets" : 1,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 545.0, 284.0, 69.0, 22.0 ],
+					"saved_object_attributes" : 					{
+						"filename" : "chords.js",
+						"parameter_enable" : 0
+					}
+,
+					"text" : "js chords.js"
+				}
+
+			}
+, 			{
 				"box" : 				{
 					"id" : "obj-29",
 					"linecount" : 3,
@@ -126,7 +191,7 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 355.0, 260.0, 342.0, 22.0 ],
+					"patching_rect" : [ 396.0, 142.0, 342.0, 22.0 ],
 					"text" : "660 0.5 0.5 880 0.5 0.5 1870 0.5 1.5 2420 0.5 1.4 1210 0.5 1.3"
 				}
 
@@ -150,7 +215,7 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 339.0, 222.0, 335.0, 22.0 ],
+					"patching_rect" : [ 380.0, 104.0, 335.0, 22.0 ],
 					"text" : "440 0.5 0.5 660 0.5 0.5 1650 0.5 1.5 2200 0.5 1.4 990 0.5 1.3"
 				}
 
@@ -162,32 +227,8 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 310.0, 184.0, 342.0, 22.0 ],
+					"patching_rect" : [ 351.0, 66.0, 342.0, 22.0 ],
 					"text" : "880 0.5 1. 1320 0.5 0.9 1650 0.9 1.5 2200 1.8 1.4 1980 0.5 2.3"
-				}
-
-			}
-, 			{
-				"box" : 				{
-					"id" : "obj-7",
-					"maxclass" : "message",
-					"numinlets" : 2,
-					"numoutlets" : 1,
-					"outlettype" : [ "" ],
-					"patching_rect" : [ 82.0, 324.0, 32.0, 22.0 ],
-					"text" : "0.25"
-				}
-
-			}
-, 			{
-				"box" : 				{
-					"id" : "obj-5",
-					"maxclass" : "button",
-					"numinlets" : 1,
-					"numoutlets" : 1,
-					"outlettype" : [ "bang" ],
-					"parameter_enable" : 0,
-					"patching_rect" : [ 82.0, 284.0, 24.0, 24.0 ]
 				}
 
 			}
@@ -269,8 +310,8 @@
  ],
 		"lines" : [ 			{
 				"patchline" : 				{
-					"destination" : [ "obj-45", 0 ],
-					"source" : [ "obj-1", 0 ]
+					"destination" : [ "obj-16", 0 ],
+					"source" : [ "obj-11", 0 ]
 				}
 
 			}
@@ -278,6 +319,29 @@
 				"patchline" : 				{
 					"destination" : [ "obj-33", 0 ],
 					"source" : [ "obj-14", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-11", 0 ],
+					"order" : 1,
+					"source" : [ "obj-15", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-8", 0 ],
+					"order" : 0,
+					"source" : [ "obj-15", 0 ]
+				}
+
+			}
+, 			{
+				"patchline" : 				{
+					"destination" : [ "obj-45", 0 ],
+					"source" : [ "obj-16", 0 ]
 				}
 
 			}
@@ -325,13 +389,6 @@
 			}
 , 			{
 				"patchline" : 				{
-					"destination" : [ "obj-45", 0 ],
-					"source" : [ "obj-4", 0 ]
-				}
-
-			}
-, 			{
-				"patchline" : 				{
 					"destination" : [ "obj-44", 1 ],
 					"order" : 0,
 					"source" : [ "obj-45", 0 ]
@@ -343,13 +400,6 @@
 					"destination" : [ "obj-44", 0 ],
 					"order" : 1,
 					"source" : [ "obj-45", 0 ]
-				}
-
-			}
-, 			{
-				"patchline" : 				{
-					"destination" : [ "obj-7", 0 ],
-					"source" : [ "obj-5", 0 ]
 				}
 
 			}
@@ -385,20 +435,29 @@
 			}
 , 			{
 				"patchline" : 				{
-					"destination" : [ "obj-45", 0 ],
-					"source" : [ "obj-7", 0 ]
+					"destination" : [ "obj-17", 1 ],
+					"order" : 0,
+					"source" : [ "obj-8", 0 ]
 				}
 
 			}
 , 			{
 				"patchline" : 				{
 					"destination" : [ "obj-45", 0 ],
-					"source" : [ "obj-9", 0 ]
+					"order" : 1,
+					"source" : [ "obj-8", 0 ]
 				}
 
 			}
  ],
 		"dependency_cache" : [ 			{
+				"name" : "chords.js",
+				"bootpath" : "~/Documents/GitHub/ice_proj_419/Max Patch/Ice/duplicates/duplicates_2022-11-10_15-02-46",
+				"patcherrelativepath" : "../duplicates/duplicates_2022-11-10_15-02-46",
+				"type" : "TEXT",
+				"implicit" : 1
+			}
+, 			{
 				"name" : "resonators~.mxe64",
 				"type" : "mx64"
 			}
