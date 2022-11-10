@@ -6,14 +6,18 @@ pub struct Node<'a> {
     pub imp_stress: f32,
     stresses: Stresses,
     pub edges: [Option<&'a Edge<'a>>; 6],
+    pub row: usize,
+    pub col: usize,
 }
 
 impl<'a> Node<'a> {
-    pub fn new(imp_stress: f32) -> Self {
+    pub(super) fn new(imp_stress: f32, row: usize, col: usize) -> Self {
         Self {
             imp_stress,
             edges: [None; 6],
             stresses: Stresses::default(),
+            row,
+            col,
         }
     }
     
