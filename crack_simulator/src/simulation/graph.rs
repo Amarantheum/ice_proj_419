@@ -16,7 +16,7 @@ pub struct Graph<'a> {
     node_matrix: Box<[Node<'a>]>,
     /// matrix of edges. Note there's 3 types of edges at each level
     /// 0 => -, 1 => /, 2 => \
-    edge_matrix: Box<[[Option<Edge<'a>>; 3]]>,
+    edge_matrix: Box<[[Edge<'a>; 3]]>,
 }
 
 impl<'a> Graph<'a> {
@@ -47,7 +47,7 @@ impl<'a> Graph<'a> {
         }
     }
     #[inline]
-    unsafe fn init<'b>(rows: usize, cols: usize, node_matrix: *mut [Node<'b>], edge_matrix: *mut [[Option<Edge<'b>>; 3]]) {
+    unsafe fn init<'b>(rows: usize, cols: usize, node_matrix: *mut [Node<'b>], edge_matrix: *mut [[Edge<'b>; 3]]) {
         // initialize node matrix
         for i in 0..(rows * cols) {
             (*node_matrix)[i] = Node::new(Self::get_init_implicit_node_stress());
@@ -62,9 +62,9 @@ impl<'a> Graph<'a> {
                 // fill in horizontal edges for this row
                 if x < cols - 1 {
                     // if we aren't on the last col, link this node to the node adjacent to the right
-                    (*edge_matrix)[y * cols + x][0] = Some(Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 0, get_node(x + 1, y), 3));
+                    (*edge_matrix)[y * cols + x][0] = Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 0, get_node(x + 1, y), 3, &(*edge_matrix)[y * cols + x][0]);
                 } else {
-                    (*edge_matrix)[y * cols + x][0] = None;
+                    (*edge_matrix)[y * cols + x][0] = Edge::null();
                 }
 
                 if y < rows - 1 {
@@ -72,23 +72,23 @@ impl<'a> Graph<'a> {
                     if y % 2 != 1 {
                         // if we're on an even row (including row 0)
                         if x > 0 {
-                            (*edge_matrix)[y * cols + x][1] = Some(Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 4, get_node(x - 1, y + 1), 1));
+                            (*edge_matrix)[y * cols + x][1] = Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 4, get_node(x - 1, y + 1), 1, &(*edge_matrix)[y * cols + x][1]);
                         } else {
-                            (*edge_matrix)[y * cols + x][1] = None;
+                            (*edge_matrix)[y * cols + x][1] = Edge::null();
                         }
-                        (*edge_matrix)[y * cols + x][2] = Some(Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 5, get_node(x, y + 1), 2));
+                        (*edge_matrix)[y * cols + x][2] = Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 5, get_node(x, y + 1), 2, &(*edge_matrix)[y * cols + x][2]);
                     } else {
-                        (*edge_matrix)[y * cols + x][1] = Some(Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 4, get_node(x, y + 1), 1));
+                        (*edge_matrix)[y * cols + x][1] = Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 4, get_node(x, y + 1), 1, &(*edge_matrix)[y * cols + x][1]);
                         if x < cols - 1 {
-                            (*edge_matrix)[y * cols + x][2] = Some(Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 5, get_node(x + 1, y + 1), 2));
+                            (*edge_matrix)[y * cols + x][2] = Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 5, get_node(x + 1, y + 1), 2, &(*edge_matrix)[y * cols + x][2]);
                         } else {
-                            (*edge_matrix)[y * cols + x][2] = None;
+                            (*edge_matrix)[y * cols + x][2] = Edge::null();
                         }
                     }
                 } else {
                     // if we're on the last row
-                    (*edge_matrix)[y * cols + x][1] = None;
-                    (*edge_matrix)[y * cols + x][2] = None;
+                    (*edge_matrix)[y * cols + x][1] = Edge::null();
+                    (*edge_matrix)[y * cols + x][2] = Edge::null();
                 }
             }
            
@@ -107,13 +107,22 @@ impl<'a> Graph<'a> {
     }
 
     #[inline]
-    pub fn get_edge(&'a self, x: usize, y: usize, t: usize) -> &'a Option<Edge<'a>> {
-        &self.edge_matrix[y * self.cols + x][t]
+    pub fn get_edge(&'a self, x: usize, y: usize, t: usize) -> Option<&'a Edge<'a>> {
+        if self.edge_matrix[y * self.cols + x][t].valid {
+            Some(&self.edge_matrix[y * self.cols + x][t])
+        } else {
+            None
+        }
     }
     
     #[inline]
-    pub fn get_edge_mut(&'a mut self, x: usize, y: usize, t: usize) -> &'a mut Option<Edge<'a>> {
-        &mut self.edge_matrix[y * self.cols + x][t]
+    pub fn get_edge_mut(&'a mut self, x: usize, y: usize, t: usize) -> Option<&'a mut Edge<'a>> {
+        if self.edge_matrix[y * self.cols + x][t].valid {
+            Some(&mut self.edge_matrix[y * self.cols + x][t])
+        } else {
+            None
+        }
+        
     }
 
     fn get_init_implicit_node_stress() -> f32 {
@@ -134,21 +143,9 @@ mod tests {
 
     #[test]
     fn test_random_traverse() {
-        let mut g = Graph::new(2, 2);
+        let mut g = Graph::new(1000, 1000);
 
         let mut cur_node = g.get_node(0, 0);
-        println!("FASDASD");
-
-        println!("node: {}", cur_node.imp_stress);
-        for i in 0..6 {
-            match cur_node.edges[i] {
-                Some(v) => {
-                    println!("EDGE: {}", v.imp_stress);
-                },
-                None => println!("NONE"),
-            }
-        }
-
 
         for i in 0..100000 {
             let mut n = random::<usize>() % 6;
