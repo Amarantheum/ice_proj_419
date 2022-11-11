@@ -1,9 +1,11 @@
 inlets = 1;
-outlets = 2;
+outlets = 4;
 
 setinletassist(0, "bang input");
 setoutletassist(0, "returns next chord in sequence");
-setoutletassist(1, "returns count number")
+setoutletassist(1, "returns next chord in sequence");
+setoutletassist(2, "returns next chord in sequence");
+setoutletassist(3, "returns count number")
 
 var count = 0;
 var chordArr = [
@@ -13,12 +15,14 @@ var chordArr = [
 ];
 
 function bang() {
-	outlet(0, chordArr[count]);
+	// iterate through outlets as resonators can only play one chord
+	// at any time
+	outlet(count % 3, chordArr[count]);
 	count++;
 	// just keeping this here for testing so i don't have to reset
 	// the patch constantly
 	if (count > chordArr.length) {
 		count = 0;
 	}
-	outlet(1, count);
+	outlet(3, count);
 }
