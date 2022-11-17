@@ -1,8 +1,11 @@
 use node::Node;
 use edge::Edge;
+use rayon::{slice::{ParallelSlice, ParallelSliceMut}, current_num_threads};
 
 use self::node::NodeIndex;
 use self::edge::EdgeIndex;
+
+use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 pub mod node;
 pub mod edge;
@@ -76,21 +79,16 @@ impl Graph {
                         // if we're on an even row (including row 0)
                         if x > 0 {
                             cur[1] = Some(Edge::new(Self::get_init_implicit_edge_stress(), [y, x].into(), 4, [y + 1, x - 1].into(), 1, y, x, 1, &mut self.node_matrix));
-                            //(*edge_matrix)[y * cols + x][1] = Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 4, get_node(x - 1, y + 1), 1, &(*edge_matrix)[y * cols + x][1], y, x, 1);
                         } else {
                             cur[1] = None;
                         }
                         cur[2] = Some(Edge::new(Self::get_init_implicit_edge_stress(), [y, x].into(), 5, [y + 1, x].into(), 2, y, x, 2, &mut self.node_matrix));
-                        //(*edge_matrix)[y * cols + x][2] = Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 5, get_node(x, y + 1), 2, &(*edge_matrix)[y * cols + x][2], y, x, 2);
                     } else {
                         cur[1] = Some(Edge::new(Self::get_init_implicit_edge_stress(), [y, x].into(), 4, [y + 1, x].into(), 1, y, x, 1, &mut self.node_matrix));
-                        //(*edge_matrix)[y * cols + x][1] = Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 4, get_node(x, y + 1), 1, &(*edge_matrix)[y * cols + x][1], y, x, 1);
                         if x < self.cols - 1 {
                             cur[2] = Some(Edge::new(Self::get_init_implicit_edge_stress(), [y, x].into(), 5, [y + 1, x + 1].into(), 2, y, x, 2, &mut self.node_matrix));
-                            //(*edge_matrix)[y * cols + x][2] = Edge::new(Self::get_init_implicit_edge_stress(), get_node(x, y), 5, get_node(x + 1, y + 1), 2, &(*edge_matrix)[y * cols + x][2], y, x, 2);
                         } else {
                             cur[2] = None;
-                            //(*edge_matrix)[y * cols + x][2] = Edge::null();
                         }
                     }
                 } else {
@@ -105,22 +103,22 @@ impl Graph {
     }
 
     #[inline]
-    pub fn get_node<'a>(&'a self, i: NodeIndex) -> &'a Node {
+    pub fn get_node(&self, i: NodeIndex) -> &Node {
         self.node_matrix.get(i)
     }
 
     #[inline]
-    pub fn get_node_mut<'a>(&'a mut self, i: NodeIndex) -> &'a mut Node {
+    pub fn get_node_mut(&mut self, i: NodeIndex) -> &mut Node {
         self.node_matrix.get_mut(i)
     }
 
     #[inline]
-    pub fn get_edge<'a>(&'a self, x: usize, y: usize, t: usize) -> Option<&'a Edge> {
+    pub fn get_edge(&self, x: usize, y: usize, t: usize) -> Option<&Edge> {
         self.edge_matrix.v[y][x][t].as_ref()
     }
     
     #[inline]
-    pub fn get_edge_mut<'a>(&'a mut self, x: usize, y: usize, t: usize) -> Option<&'a mut Edge> {
+    pub fn get_edge_mut(&mut self, x: usize, y: usize, t: usize) -> Option<&mut Edge> {
         self.edge_matrix.v[y][x][t].as_mut()
     }
 
@@ -132,6 +130,18 @@ impl Graph {
     fn get_init_implicit_edge_stress() -> f32 {
         // TODO randomize here?
         0_f32
+    }
+
+    pub fn update_graph_edge_stresses(&mut self) {
+        self.edge_matrix.v.par_iter_mut().for_each(|v| {
+            for vv in v {
+                for i in 0..3 {
+                    if let Some(e) = vv[i].as_mut() {
+                        e.update_total_stress(&self.node_matrix);
+                    }
+                }
+            }
+        });
     }
 }
 
@@ -159,6 +169,7 @@ impl EdgeMatrix {
 mod tests {
     use super::*;
     use rand::prelude::*;
+    use std::time;
 
     #[test]
     fn test_random_traverse() {
@@ -179,5 +190,14 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_update_edge_stresses() {
+        let mut g = Graph::new(1080, 1920);
+        
+        let t = time::Instant::now();
+        g.update_graph_edge_stresses();
+        println!("time: {}", t.elapsed().as_micros());
     }
 }
