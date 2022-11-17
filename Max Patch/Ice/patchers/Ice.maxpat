@@ -10,7 +10,7 @@
 		}
 ,
 		"classnamespace" : "box",
-		"rect" : [ 757.0, 175.0, 1059.0, 717.0 ],
+		"rect" : [ 757.0, 175.0, 659.0, 717.0 ],
 		"bglocked" : 0,
 		"openinpresentation" : 0,
 		"default_fontsize" : 12.0,
@@ -46,8 +46,8 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 442.0, 65.0, 119.0, 146.0 ],
-					"text" : ";\r\ndsp start;\r\nchorusPreset 5;\r\nchorusVol 60;\r\nharmVol 60;\r\nharmTranspose 216;\r\nharmDelay 60;\r\nharm FB 0.35;\r\n"
+					"patching_rect" : [ 439.0, 48.0, 119.0, 146.0 ],
+					"text" : ";\r\ndsp start;\r\nchorusPreset 5;\r\nchorusVol 60;\r\nharmVol 60;\r\nharmTranspose 216;\r\nharmDelay 60;\r\nharmFB 0.35;\r\n"
 				}
 
 			}
@@ -149,7 +149,7 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 442.0, 36.0, 69.0, 22.0 ],
+					"patching_rect" : [ 439.0, 19.0, 69.0, 22.0 ],
 					"presentation" : 1,
 					"presentation_rect" : [ 245.5, 25.0, 69.0, 22.0 ],
 					"text" : "INITIALIZE",
@@ -356,7 +356,7 @@
 										}
 ,
 										"classnamespace" : "box",
-										"rect" : [ -11.0, 167.0, 1126.0, 480.0 ],
+										"rect" : [ 42.0, 167.0, 1126.0, 480.0 ],
 										"bglocked" : 0,
 										"openinpresentation" : 0,
 										"default_fontsize" : 12.0,
@@ -2216,13 +2216,6 @@
 , 			{
 				"name" : "harmonizerInfo.maxpat",
 				"bootpath" : "E:/Users/Yorke/Documents/Max 8/Library/UBCToolbox_1.05/Modules/Effects/harmonizer/lib",
-				"type" : "JSON",
-				"implicit" : 1
-			}
-, 			{
-				"name" : "harm.json",
-				"bootpath" : "~/Documents/GitHub/ice_proj_419/Max Patch/Ice/data",
-				"patcherrelativepath" : "../data",
 				"type" : "JSON",
 				"implicit" : 1
 			}
