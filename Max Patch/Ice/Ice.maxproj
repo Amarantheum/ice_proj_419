@@ -2,7 +2,7 @@
 	"name" : "Ice",
 	"version" : 1,
 	"creationdate" : 3750614287,
-	"modificationdate" : 3750937182,
+	"modificationdate" : 3751484069,
 	"viewrect" : [ 25.0, 107.0, 300.0, 500.0 ],
 	"autoorganize" : 1,
 	"hideprojectwindow" : 0,
@@ -18,10 +18,27 @@
 
 		}
 ,
+		"media" : 		{
+
+		}
+,
 		"code" : 		{
 			"chords.js" : 			{
 				"kind" : "javascript",
 				"local" : 1
+			}
+
+		}
+,
+		"data" : 		{
+			"harm.json" : 			{
+				"kind" : "json",
+				"local" : 1,
+				"singleton" : 				{
+					"bootpath" : "~/Documents/GitHub/ice_proj_419/Max Patch",
+					"projectrelativepath" : ".."
+				}
+
 			}
 
 		}

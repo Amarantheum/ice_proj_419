@@ -10,6 +10,7 @@ setoutletassist(4, "returns next chord in sequence");
 setoutletassist(5, "returns count number")
 
 var count = 0;
+// make them longer at the beginning
 var chordArr = [
 	[880, 0.5, 1., 1320, 0.5, 0.9, 1650, 0.9, 1.5, 2200, 1.8, 1.4, 1980, 0.5, 2.3],
 	[660, 0.5, 0.8, 990, 0.5, 1.2, 1110, 0.8, 1.3, 1480, 0.8, 1.4, 1160, 0.8, 1.3],
