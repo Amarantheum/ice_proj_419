@@ -1,43 +1,37 @@
-use super::node::Node;
+use super::{node::{Node, NodeIndex}, NodeMatrix};
 
-pub struct Edge<'a> {
-    /// implicit stress in the edge
-    pub imp_stress: f32,
-    pub nodes: [&'a Node<'a>; 2],
-    pub(super) valid: bool,
-
-    row: usize,
-    col: usize,
-    ty: usize,
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct EdgeIndex {
+    pub row: usize,
+    pub col: usize,
+    pub ty: usize,
 }
 
-impl<'a> Edge<'a> {
-    pub(super) fn new(imp_stress: f32, n1: &'a Node<'a>, s1: usize, n2: &'a Node<'a>, s2: usize, loc: *const Edge, row: usize, col: usize, ty: usize) -> Self {
+pub struct Edge {
+    /// implicit stress in the edge
+    pub imp_stress: f32,
+    pub nodes: [NodeIndex; 2],
+
+    pub index: EdgeIndex,
+}
+
+impl Edge {
+    pub(super) fn new(imp_stress: f32, n1: NodeIndex, s1: usize, n2: NodeIndex, s2: usize, row: usize, col: usize, ty: usize, matrix: &mut NodeMatrix) -> Self {
         debug_assert!(ty < 3);
         let out = Self {
             imp_stress,
             nodes: [n1, n2],
-            valid: true,
-            row,
-            col,
-            ty,
+            index: EdgeIndex { row, col, ty },
         };
-        unsafe {
-            n1.get_mut_edges()[s1] = Some(&*loc);
-            n2.get_mut_edges()[s2] = Some(&*loc);
-        }
+        
+        matrix.get_mut(n1).update_edge(s1, out.index);
+        matrix.get_mut(n2).update_edge(s2, out.index);
+
         out
     }
 
-    #[allow(invalid_value)]
-    pub(super) unsafe fn null() -> Self {
-        let mut out: Self = std::mem::MaybeUninit::uninit().assume_init();
-        out.valid = false;
-        out
-    }
-
-    pub fn traverse(&'a self, n: &'a Node<'a>) -> &'a Node<'a> {
-        if self.nodes[0] as *const Node == n as *const Node {
+    pub fn traverse(&self, n: NodeIndex) -> NodeIndex {
+        if self.nodes[0] == n {
             self.nodes[1]
         } else {
             self.nodes[0]

@@ -1,38 +1,56 @@
+use super::{NodeMatrix, EdgeMatrix};
 use super::stress_vec::StressVec;
-use super::edge::Edge;
+use super::edge::{Edge, EdgeIndex};
 
-pub struct Node<'a> {
-    // the implicit stress in the node
-    pub imp_stress: f32,
-    stresses: Stresses,
-    pub edges: [Option<&'a Edge<'a>>; 6],
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct NodeIndex {
     pub row: usize,
     pub col: usize,
 }
 
-impl<'a> Node<'a> {
+impl From<[usize; 2]> for NodeIndex {
+    fn from(v: [usize; 2]) -> Self {
+        Self {
+            row: v[0],
+            col: v[1],
+        }
+    }
+}
+
+pub struct Node {
+    // the implicit stress in the node
+    pub imp_stress: f32,
+    stresses: Stresses,
+    pub edges: [Option<EdgeIndex>; 6],
+    
+    pub index: NodeIndex,
+}
+
+impl Node {
     pub(super) fn new(imp_stress: f32, row: usize, col: usize) -> Self {
         Self {
             imp_stress,
             edges: [None; 6],
             stresses: Stresses::default(),
-            row,
-            col,
+            index: NodeIndex { row, col }
         }
-    }
-    
-    /// Returns a mutable pointer to this node's edges from an immutable pointer
-    pub unsafe fn get_mut_edges<'b>(&self) -> &'b mut [Option<&'a Edge<'a>>; 6] {
-        &mut *(&(self.edges) as *const [Option<&'a Edge<'a>>; 6] as *mut [Option<&'a Edge<'a>>; 6])
     }
 
     /// Get the node adjacent to this node in direction n (n=0 => 0rad, n=1 => pi/3rad ...)
-    pub fn get_adjacent_node_n(&'a self, n: usize) -> Option<&'a Node<'a>> {
+    pub fn get_adjacent_node_n(&self, n: usize, matrix: &EdgeMatrix) -> Option<NodeIndex> {
         debug_assert!(n < 6);
         match self.edges[n] {
-            Some(e) => Some(e.traverse(&self)),
+            Some(e) => {
+                let edge = matrix.get(e)
+                    .expect("this should never fail...");
+                Some(edge.traverse(self.index))
+            },
             None => None,
         }
+    }
+
+    pub(super) fn update_edge(&mut self, edge: usize, i: EdgeIndex) {
+        self.edges[edge] = Some(i)
     }
 }
 
