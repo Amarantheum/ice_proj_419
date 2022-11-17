@@ -193,6 +193,13 @@ mod tests {
     }
 
     #[test]
+    fn test_verify_graph() {
+        let mut g = Graph::new(1000, 1000);
+
+
+    }
+
+    #[test]
     fn test_update_edge_stresses() {
         let mut g = Graph::new(1080, 1920);
         
