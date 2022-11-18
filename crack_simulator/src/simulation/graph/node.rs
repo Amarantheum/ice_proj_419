@@ -62,17 +62,17 @@ impl Node {
             req_edges.insert(i);
         }
 
-        if self.index.col == 0 {
+        if self.index.row == 0 {
             req_edges.remove(&1);
             req_edges.remove(&2);
         }
 
-        if self.index.col == cols - 1 {
+        if self.index.row == rows - 1 {
             req_edges.remove(&4);
             req_edges.remove(&5);
         }
 
-        if self.index.row == 0 {
+        if self.index.col == 0 {
             if self.index.row % 2 == 0 {
                 req_edges.remove(&2);
                 req_edges.remove(&4);
@@ -80,13 +80,15 @@ impl Node {
             req_edges.remove(&3);
         }
 
-        if self.index.row == rows - 1 {
+        if self.index.col == cols - 1 {
             if self.index.row % 2 == 1 {
                 req_edges.remove(&1);
                 req_edges.remove(&5);
             }
             req_edges.remove(&0);
         }
+
+        //println!("index: {:?}, required_edges: {:?}", index, req_edges);
 
         for e in req_edges {
             let edge = e_matrix.get(self.edges[e].expect("edge shouldn't be None")).expect("edge shouldn't be None");
@@ -95,7 +97,7 @@ impl Node {
                 1 | 2 | 3 => assert!(edge.nodes[1] == self.index),
                 _ => unreachable!(),
             }
-            //edge.verify(n_matrix)
+            edge.verify(n_matrix)
         }
     }
 }

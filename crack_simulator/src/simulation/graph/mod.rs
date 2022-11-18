@@ -1,5 +1,6 @@
 use node::Node;
 use edge::Edge;
+use rand::random;
 use rayon::{slice::{ParallelSlice, ParallelSliceMut}, current_num_threads};
 
 use self::node::NodeIndex;
@@ -124,7 +125,7 @@ impl Graph {
 
     fn get_init_implicit_node_stress() -> f32 {
         // TODO randomize here?
-        0_f32
+        random()
     }
 
     fn get_init_implicit_edge_stress() -> f32 {
@@ -172,31 +173,14 @@ mod tests {
     use std::time;
 
     #[test]
-    fn test_random_traverse() {
+    fn test_verify_graph() {
         let g = Graph::new(1000, 1000);
 
-        let mut cur_node = g.get_node([0, 0].into());
-
-        for _ in 0..100000 {
-            let mut n = random::<usize>() % 6;
-            //println!("at node: {:?}", cur_node.index);
-            loop {
-                if let Some(v) = cur_node.get_adjacent_node_n(n, &g.edge_matrix) {
-                    cur_node = g.node_matrix.get(v);
-                    break;
-                } else {
-                    n += 1;
-                    n %= 6;
-                }
+        for r in 0..g.rows {
+            for c in 0..g.cols {
+                g.node_matrix.v[r][c].verify(&g.node_matrix, &g.edge_matrix, g.rows, g.cols, [r, c].into());
             }
         }
-    }
-
-    #[test]
-    fn test_verify_graph() {
-        let mut g = Graph::new(1000, 1000);
-
-
     }
 
     #[test]
@@ -205,6 +189,6 @@ mod tests {
         
         let t = time::Instant::now();
         g.update_graph_edge_stresses();
-        println!("time: {}", t.elapsed().as_micros());
+        println!("time: {}", t.elapsed().as_millis());
     }
 }

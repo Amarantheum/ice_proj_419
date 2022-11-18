@@ -1,5 +1,8 @@
 use super::{node::{Node, NodeIndex}, NodeMatrix};
 
+const CRACK_THRESHOLD: f32 = 1.5;
+const PROPOGATION_CONST: f32 = 1.0;
+
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct EdgeIndex {
     pub row: usize,
@@ -15,7 +18,11 @@ pub struct Edge {
     pub index: EdgeIndex,
 
     // state
+    /// The total stress on the current edge
+    /// from adjacent nodes. This value is also used
+    /// when a crack occurs to propogate stress
     total_stress: f32,
+    cracked: bool,
 }
 
 impl Edge {
@@ -28,6 +35,7 @@ impl Edge {
             index: EdgeIndex { row, col, ty },
 
             total_stress: 0.0,
+            cracked: false,
         };
         
         matrix.get_mut(n1).update_edge(s1, out.index);
@@ -45,7 +53,9 @@ impl Edge {
         }
     }
 
+    #[inline]
     pub(super) fn update_total_stress(&mut self, matrix: &NodeMatrix) {
+        if self.cracked { return }
         let n1 = matrix.get(self.nodes[0]);
         let n2 = matrix.get(self.nodes[0]);
         self.total_stress = self.imp_stress
@@ -67,5 +77,25 @@ impl Edge {
                     _ => unreachable!(),
                 }
             );
+        if self.total_stress > CRACK_THRESHOLD {
+            self.cracked = true;
+        }
+    }
+
+    pub fn verify(&self, n_matrix: &NodeMatrix) {
+        let indexes;
+        match self.index.ty {
+            0 => indexes = [0, 3],
+            1 => indexes = [4, 1],
+            2 => indexes = [5, 2],
+            _ => unimplemented!(),
+
+        }
+
+        let n1 = n_matrix.get(self.nodes[0]);
+        let n2 = n_matrix.get(self.nodes[1]);
+
+        assert!(n1.edges[indexes[0]].expect("Shouldn't be None") == self.index);
+        assert!(n2.edges[indexes[1]].expect("Shouldn't be None") == self.index);
     }
 }
