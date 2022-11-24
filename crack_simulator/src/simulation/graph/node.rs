@@ -1,10 +1,11 @@
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 
+use super::edge_update_list::EdgeUpdateList;
 use super::{NodeMatrix, EdgeMatrix};
 use super::stress_vec::StressVec;
 use super::edge::{Edge, EdgeIndex};
 
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Debug, Default)]
 pub struct NodeIndex {
     pub row: usize,
     pub col: usize,
@@ -19,6 +20,7 @@ impl From<[usize; 2]> for NodeIndex {
     }
 }
 
+#[derive(Default)]
 pub struct Node {
     // the implicit stress in the node
     pub imp_stress: f32,
@@ -34,7 +36,8 @@ impl Node {
             imp_stress,
             edges: [None; 6],
             stresses: Stresses::default(),
-            index: NodeIndex { row, col }
+            index: NodeIndex { row, col },
+            ..Default::default()
         }
     }
 
@@ -99,8 +102,19 @@ impl Node {
             }
             edge.verify(n_matrix)
         }
-
-        pub fn add_to_update_list(&self, )
+    }
+    
+    pub fn add_to_update_list(&self, e_update_list: &mut EdgeUpdateList, edge_matrix: &mut EdgeMatrix) -> bool {
+        for oei in self.edges {
+            if let Some(ei) = oei {
+                let e = edge_matrix.get(ei)
+                    .expect("shouldn't be none");
+                if !e.is_scheduled_for_update() {
+                    e_update_list.push(e.index);
+                }
+            }
+        }
+        true
     }
 }
 

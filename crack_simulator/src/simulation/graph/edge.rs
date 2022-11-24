@@ -1,16 +1,19 @@
-use super::{node::{Node, NodeIndex}, NodeMatrix};
+use std::collections::VecDeque;
+
+use super::{node::{Node, NodeIndex}, NodeMatrix, edge_update_list::EdgeUpdateList, EdgeMatrix};
 use super::stress_vec::StressVec;
 
 const CRACK_THRESHOLD: f32 = 1.5;
 const PROPOGATION_CONST: f32 = 1.0;
 
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Debug, Default)]
 pub struct EdgeIndex {
     pub row: usize,
     pub col: usize,
     pub ty: usize,
 }
 
+#[derive(Default)]
 pub struct Edge {
     /// implicit stress in the edge
     pub imp_stress: f32,
@@ -24,6 +27,7 @@ pub struct Edge {
     /// when a crack occurs to propogate stress
     total_stress: f32,
     cracked: bool,
+    scheduled_for_update: bool,
 }
 
 impl Edge {
@@ -34,9 +38,7 @@ impl Edge {
             imp_stress,
             nodes: [n1, n2],
             index: EdgeIndex { row, col, ty },
-
-            total_stress: 0.0,
-            cracked: false,
+            ..Default::default()
         };
         
         matrix.get_mut(n1).update_edge(s1, out.index);
@@ -117,5 +119,17 @@ impl Edge {
 
         assert!(n1.edges[indexes[0]].expect("Shouldn't be None") == self.index);
         assert!(n2.edges[indexes[1]].expect("Shouldn't be None") == self.index);
+    }
+
+    pub fn set_scheduled_for_update(&mut self) {
+        self.scheduled_for_update = true;
+    }
+
+    pub fn unset_scheduled_for_update(&mut self) {
+        self.scheduled_for_update = false;
+    }
+
+    pub fn is_scheduled_for_update(&self) -> bool {
+        self.scheduled_for_update
     }
 }

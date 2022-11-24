@@ -1,7 +1,6 @@
-use std::collections::VecDeque;
-
 use node::Node;
 use edge::Edge;
+use edge_update_list::EdgeUpdateList;
 use rand::random;
 use rayon::{slice::{ParallelSlice, ParallelSliceMut}, current_num_threads};
 
@@ -12,9 +11,8 @@ use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 pub mod node;
 pub mod edge;
+mod edge_update_list;
 mod stress_vec;
-
-type NodeUpdateList = VecDeque<NodeIndex>;
 
 pub struct NodeMatrix {
     v: Vec<Vec<Node>>,
@@ -41,8 +39,7 @@ pub struct Graph {
     /// 0 => -, 1 => /, 2 => \
     edge_matrix: EdgeMatrix,
 
-    update_edge_list: VecDeque<EdgeIndex>,
-    update_node_list: VecDeque<NodeIndex>,
+    update_edge_list: EdgeUpdateList,
 }
 
 impl Graph {
@@ -54,8 +51,7 @@ impl Graph {
             cols,
             node_matrix: NodeMatrix { v: Vec::with_capacity(rows) },
             edge_matrix: EdgeMatrix { v: Vec::with_capacity(rows) },
-            update_edge_list: VecDeque::with_capacity(rows * cols * 3),
-            update_node_list: VecDeque::with_capacity(rows * cols),
+            update_edge_list: EdgeUpdateList::new(rows * cols * 3),
         };
         out.init();
         out
@@ -67,7 +63,6 @@ impl Graph {
             let mut cur = Vec::with_capacity(self.cols);
             for c in 0..self.cols {
                 cur.push(Node::new(Self::get_init_implicit_node_stress(), r, c));
-                self.update_node_list.push_back([r, c].into());
             }
             self.node_matrix.v.push(cur);
         }
@@ -108,11 +103,13 @@ impl Graph {
                     cur[2] = None;
                 }
                 cur_vec.push(cur);
-                for i in 0..3 {
-                    self.update_edge_list.push_back(EdgeIndex { row: y, col: x, ty: i });
-                }
             }
             self.edge_matrix.v.push(cur_vec);
+        }
+        for v in &self.node_matrix.v {
+            for vv in v {
+                vv.add_to_update_list(&mut self.update_edge_list, &mut self.edge_matrix);
+            }
         }
     }
 
@@ -147,20 +144,11 @@ impl Graph {
     }
 
     pub fn update_graph_edge_stresses(&mut self) {
-        while let Some(v) = self.update_edge_list.pop_front() {
+        while let Some(v) = self.update_edge_list.pop() {
             if let Some(e) = self.edge_matrix.get_mut(v) {
                 e.update_total_stress(&self.node_matrix);
             }
         }
-        // self.edge_matrix.v.par_iter_mut().for_each(|v| {
-        //     for vv in v {
-        //         for i in 0..3 {
-        //             if let Some(e) = vv[i].as_mut() {
-        //                 e.update_total_stress(&self.node_matrix);
-        //             }
-        //         }
-        //     }
-        // });
     }
 }
 
@@ -193,7 +181,6 @@ mod tests {
     #[test]
     fn test_verify_graph() {
         let g = Graph::new(1000, 1000);
-
         for r in 0..g.rows {
             for c in 0..g.cols {
                 g.node_matrix.v[r][c].verify(&g.node_matrix, &g.edge_matrix, g.rows, g.cols, [r, c].into());
@@ -208,5 +195,9 @@ mod tests {
         let t = time::Instant::now();
         g.update_graph_edge_stresses();
         println!("time: {}", t.elapsed().as_millis());
+        
+        let t = time::Instant::now();
+        g.update_graph_edge_stresses();
+        println!("time: {}", t.elapsed().as_nanos());
     }
 }
