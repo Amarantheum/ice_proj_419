@@ -4,7 +4,7 @@ use edge_update_list::EdgeUpdateList;
 use rand::random;
 use rayon::{slice::{ParallelSlice, ParallelSliceMut}, current_num_threads};
 
-use self::node::NodeIndex;
+use self::{node::NodeIndex, edge::EdgeUpdateStatus};
 use self::edge::EdgeIndex;
 
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
@@ -144,11 +144,53 @@ impl Graph {
     }
 
     pub fn update_graph_edge_stresses(&mut self) {
-        while let Some(v) = self.update_edge_list.pop() {
-            if let Some(e) = self.edge_matrix.get_mut(v) {
-                e.update_total_stress(&self.node_matrix);
+        let update_n = self.update_edge_list.size();
+        for _ in 0..update_n {
+            if let Some(e) = self.edge_matrix.get_mut(self.update_edge_list.pop().expect("shouldn't be none")) {
+                e.update_total_stress(&self.node_matrix, &mut self.update_edge_list);
             }
         }
+    }
+
+    pub fn update_graph_stress_propagation(&mut self) {
+        let update_n = self.update_edge_list.size();
+        for _ in 0..update_n {
+            // get next edge
+            let e = self.update_edge_list.pop()
+                .expect("shouldn't be none");
+            // set not scheduled to update as long as it isn't scheduled for stress update
+            self.edge_matrix.get_mut(e).expect("shouldn't be none").set_update_status_propogated();
+            // get orthogonal nodes
+            let orth_nodes = self.edge_matrix.get(e)
+                .expect("shouldn't be none")
+                .get_orthogonal_nodes(&self.node_matrix, &self.edge_matrix);
+            // propogate stress
+            self.edge_matrix.get_mut(e)
+                .expect("shouldn't be none")
+                .propogate_stress(&mut self.node_matrix, orth_nodes, &mut self.update_edge_list);
+            // add edges to update to update list    
+            for n in orth_nodes {
+                if let Some(nn) = n {
+                    self.node_matrix.get(nn).add_to_update_list(&mut self.update_edge_list, &mut self.edge_matrix);
+                }
+            }
+        }
+    }
+
+    fn valid_edge_assert_not(&mut self, s: EdgeUpdateStatus) -> bool {
+        for e in &self.update_edge_list.v {
+            if self.edge_matrix.get(*e).expect("shouldn't be none").get_update_status() == s {
+                return false;
+            }
+        }
+        true
+    }
+
+    pub fn main_loop(&mut self) {
+        self.update_graph_edge_stresses();
+        debug_assert!(self.valid_edge_assert_not(EdgeUpdateStatus::StressUpdate));
+        self.update_graph_stress_propagation();
+        debug_assert!(self.valid_edge_assert_not(EdgeUpdateStatus::PropogationUpdate));
     }
 }
 
@@ -199,5 +241,16 @@ mod tests {
         let t = time::Instant::now();
         g.update_graph_edge_stresses();
         println!("time: {}", t.elapsed().as_nanos());
+    }
+
+    #[test]
+    fn test_main_loop() {
+        println!("main loop");
+        let mut g = Graph::new(1080, 1920);
+        for _ in 0..10 {
+            let t = time::Instant::now();
+            g.main_loop();
+            println!("main loop time: {}", t.elapsed().as_nanos());
+        }
     }
 }

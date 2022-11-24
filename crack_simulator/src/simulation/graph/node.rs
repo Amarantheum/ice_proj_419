@@ -3,7 +3,7 @@ use std::collections::{HashSet, VecDeque};
 use super::edge_update_list::EdgeUpdateList;
 use super::{NodeMatrix, EdgeMatrix};
 use super::stress_vec::StressVec;
-use super::edge::{Edge, EdgeIndex};
+use super::edge::{Edge, EdgeIndex, EdgeUpdateStatus};
 
 #[derive(Copy, Clone, PartialEq, Debug, Default)]
 pub struct NodeIndex {
@@ -109,7 +109,7 @@ impl Node {
             if let Some(ei) = oei {
                 let e = edge_matrix.get(ei)
                     .expect("shouldn't be none");
-                if !e.is_scheduled_for_update() {
+                if !(e.get_update_status() == EdgeUpdateStatus::StressUpdate) {
                     e_update_list.push(e.index);
                 }
             }

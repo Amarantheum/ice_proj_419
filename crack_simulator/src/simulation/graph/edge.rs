@@ -13,6 +13,19 @@ pub struct EdgeIndex {
     pub ty: usize,
 }
 
+#[derive(PartialEq, Clone, Copy)]
+pub enum EdgeUpdateStatus {
+    NoUpdate,
+    StressUpdate,
+    PropogationUpdate,
+}
+
+impl Default for EdgeUpdateStatus {
+    fn default() -> Self {
+        Self::NoUpdate
+    }
+}
+
 #[derive(Default)]
 pub struct Edge {
     /// implicit stress in the edge
@@ -27,7 +40,7 @@ pub struct Edge {
     /// when a crack occurs to propogate stress
     total_stress: f32,
     cracked: bool,
-    scheduled_for_update: bool,
+    update_status: EdgeUpdateStatus,
 }
 
 impl Edge {
@@ -57,7 +70,7 @@ impl Edge {
     }
 
     #[inline]
-    pub(super) fn update_total_stress(&mut self, matrix: &NodeMatrix) {
+    pub(super) fn update_total_stress(&mut self, matrix: &NodeMatrix, update_list: &mut EdgeUpdateList) {
         if self.cracked { return }
         let n1 = matrix.get(self.nodes[0]);
         let n2 = matrix.get(self.nodes[0]);
@@ -82,6 +95,32 @@ impl Edge {
             );
         if self.total_stress > CRACK_THRESHOLD {
             self.cracked = true;
+            self.set_scheduled_for_propagate_update();
+            update_list.push(self.index);
+        } else {
+            self.set_not_scheduled_for_update();
+        }
+    }
+
+    #[inline]
+    pub(super) fn get_orthogonal_nodes(&self, n_matrix: &NodeMatrix, e_matrix: &EdgeMatrix) -> [Option<NodeIndex>; 2] {
+        match self.index.ty {
+            0 => {
+                let upper_node = n_matrix.get(self.nodes[0]).get_adjacent_node_n(1, e_matrix);
+                let lower_node = n_matrix.get(self.nodes[0]).get_adjacent_node_n(5, e_matrix);
+                [upper_node, lower_node]
+            },
+            1 => {
+                let upper_node = n_matrix.get(self.nodes[0]).get_adjacent_node_n(3, e_matrix);
+                let lower_node = n_matrix.get(self.nodes[0]).get_adjacent_node_n(5, e_matrix);
+                [upper_node, lower_node]
+            },
+            2 => {
+                let upper_node = n_matrix.get(self.nodes[0]).get_adjacent_node_n(0, e_matrix);
+                let lower_node = n_matrix.get(self.nodes[0]).get_adjacent_node_n(4, e_matrix);
+                [upper_node, lower_node]
+            },
+            _ => unreachable!(),
         }
     }
 
@@ -94,13 +133,14 @@ impl Edge {
         }
     }
 
-    pub(super) fn propogate_stress(&mut self, matrix: &mut NodeMatrix) {
+    pub(super) fn propogate_stress(&mut self, n_matrix: &mut NodeMatrix, orth_nodes: [Option<NodeIndex>; 2], e_update_list: &mut EdgeUpdateList) {
         if !self.cracked || self.total_stress == 0.0 {
             return;
         }
-
-        for n in self.nodes {
-            matrix.get_mut(n).stresses.add_stress(self.ty_to_vec(self.total_stress * PROPOGATION_CONST));
+        for n in orth_nodes {
+            if let Some(nn) = n {
+                n_matrix.get_mut(nn).stresses.add_stress(self.ty_to_vec(self.total_stress * PROPOGATION_CONST));
+            }
         }
     }
 
@@ -121,15 +161,25 @@ impl Edge {
         assert!(n2.edges[indexes[1]].expect("Shouldn't be None") == self.index);
     }
 
-    pub fn set_scheduled_for_update(&mut self) {
-        self.scheduled_for_update = true;
+    pub fn set_scheduled_for_stress_update(&mut self) {
+        self.update_status = EdgeUpdateStatus::StressUpdate;
     }
 
-    pub fn unset_scheduled_for_update(&mut self) {
-        self.scheduled_for_update = false;
+    pub fn set_scheduled_for_propagate_update(&mut self) {
+        self.update_status = EdgeUpdateStatus::PropogationUpdate;
     }
 
-    pub fn is_scheduled_for_update(&self) -> bool {
-        self.scheduled_for_update
+    pub fn set_not_scheduled_for_update(&mut self) {
+        self.update_status = EdgeUpdateStatus::NoUpdate;
+    }
+
+    pub fn set_update_status_propogated(&mut self) {
+        if self.update_status == EdgeUpdateStatus::PropogationUpdate {
+            self.update_status = EdgeUpdateStatus::NoUpdate;
+        }
+    }
+
+    pub fn get_update_status(&self) -> EdgeUpdateStatus {
+        self.update_status
     }
 }
