@@ -99,36 +99,34 @@ impl Node {
             }
             edge.verify(n_matrix)
         }
+
+        pub fn add_to_update_list(&self, )
     }
 }
 
 pub struct Stresses {
-    right: f32,
-    up: f32,
-    left: f32,
-    down: f32,
+    d0: f32,
+    d1: f32,
+    d2: f32,
 }
 
 impl Stresses {
-    fn new(right: f32, up: f32, left: f32, down: f32) -> Self {
+    fn new(d0: f32, d1: f32, d2: f32) -> Self {
         Self {
-            right,
-            up,
-            left,
-            down,
+            d0, d1, d2
         }
     }
 
-    fn add_stress(s: StressVec) {
+    pub fn add_stress(&mut self, s: StressVec) {
         match s {
             StressVec::A0(f) => {
-
+                self.d0 += f;
             },
             StressVec::A1(f) => {
-
+                self.d1 += f;
             },
             StressVec::A2(f) => {
-
+                self.d2 += f;
             }
         }
     }
@@ -136,12 +134,9 @@ impl Stresses {
     pub fn get_dir_stress(&self, n: usize) -> f32 {
         debug_assert!(n < 6);
         match n {
-            0 => self.right,
-            1 => self.right / 2.0 + self.up * 3_f32.sqrt() / 2.0,
-            2 => self.left / 2.0 + self.up * 3_f32.sqrt() / 2.0,
-            3 => self.left,
-            4 => self.left / 2.0 + self.down * 3_f32.sqrt() / 2.0,
-            5 => self.right / 2.0 + self.down * 3_f32.sqrt() / 2.0,
+            0 | 3 => self.d0 + (self.d1 + self.d2) / 2.0,
+            1 | 4 => self.d1 + (self.d0 + self.d2) / 2.0,
+            2 | 5 => self.d2 + (self.d0 + self.d1) / 2.0,
             _ => panic!("Dir stress is not defined for undefined directions"),
         }
     }
@@ -149,6 +144,6 @@ impl Stresses {
 
 impl Default for Stresses {
     fn default() -> Self {
-        Self::new(0_f32, 0_f32, 0_f32, 0_f32)
+        Self::new(0_f32, 0_f32, 0_f32)
     }
 }

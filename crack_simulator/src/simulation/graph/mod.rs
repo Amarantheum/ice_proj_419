@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use node::Node;
 use edge::Edge;
 use rand::random;
@@ -11,6 +13,8 @@ use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 pub mod node;
 pub mod edge;
 mod stress_vec;
+
+type NodeUpdateList = VecDeque<NodeIndex>;
 
 pub struct NodeMatrix {
     v: Vec<Vec<Node>>,
@@ -36,6 +40,9 @@ pub struct Graph {
     /// matrix of edges. Note there's 3 types of edges at each level
     /// 0 => -, 1 => /, 2 => \
     edge_matrix: EdgeMatrix,
+
+    update_edge_list: VecDeque<EdgeIndex>,
+    update_node_list: VecDeque<NodeIndex>,
 }
 
 impl Graph {
@@ -47,6 +54,8 @@ impl Graph {
             cols,
             node_matrix: NodeMatrix { v: Vec::with_capacity(rows) },
             edge_matrix: EdgeMatrix { v: Vec::with_capacity(rows) },
+            update_edge_list: VecDeque::with_capacity(rows * cols * 3),
+            update_node_list: VecDeque::with_capacity(rows * cols),
         };
         out.init();
         out
@@ -57,7 +66,8 @@ impl Graph {
         for r in 0..self.rows {
             let mut cur = Vec::with_capacity(self.cols);
             for c in 0..self.cols {
-                cur.push(Node::new(Self::get_init_implicit_node_stress(), r, c))
+                cur.push(Node::new(Self::get_init_implicit_node_stress(), r, c));
+                self.update_node_list.push_back([r, c].into());
             }
             self.node_matrix.v.push(cur);
         }
@@ -98,6 +108,9 @@ impl Graph {
                     cur[2] = None;
                 }
                 cur_vec.push(cur);
+                for i in 0..3 {
+                    self.update_edge_list.push_back(EdgeIndex { row: y, col: x, ty: i });
+                }
             }
             self.edge_matrix.v.push(cur_vec);
         }
@@ -134,15 +147,20 @@ impl Graph {
     }
 
     pub fn update_graph_edge_stresses(&mut self) {
-        self.edge_matrix.v.par_iter_mut().for_each(|v| {
-            for vv in v {
-                for i in 0..3 {
-                    if let Some(e) = vv[i].as_mut() {
-                        e.update_total_stress(&self.node_matrix);
-                    }
-                }
+        while let Some(v) = self.update_edge_list.pop_front() {
+            if let Some(e) = self.edge_matrix.get_mut(v) {
+                e.update_total_stress(&self.node_matrix);
             }
-        });
+        }
+        // self.edge_matrix.v.par_iter_mut().for_each(|v| {
+        //     for vv in v {
+        //         for i in 0..3 {
+        //             if let Some(e) = vv[i].as_mut() {
+        //                 e.update_total_stress(&self.node_matrix);
+        //             }
+        //         }
+        //     }
+        // });
     }
 }
 

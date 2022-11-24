@@ -1,4 +1,5 @@
 use super::{node::{Node, NodeIndex}, NodeMatrix};
+use super::stress_vec::StressVec;
 
 const CRACK_THRESHOLD: f32 = 1.5;
 const PROPOGATION_CONST: f32 = 1.0;
@@ -82,13 +83,32 @@ impl Edge {
         }
     }
 
+    fn ty_to_vec(&self, stress: f32) -> StressVec {
+        match self.index.ty {
+            0 | 3 => StressVec::A0(stress),
+            1 | 4 => StressVec::A1(stress),
+            2 | 5 => StressVec::A2(stress),
+            _ => unreachable!(),
+        }
+    }
+
+    pub(super) fn propogate_stress(&mut self, matrix: &mut NodeMatrix) {
+        if !self.cracked || self.total_stress == 0.0 {
+            return;
+        }
+
+        for n in self.nodes {
+            matrix.get_mut(n).stresses.add_stress(self.ty_to_vec(self.total_stress * PROPOGATION_CONST));
+        }
+    }
+
     pub fn verify(&self, n_matrix: &NodeMatrix) {
         let indexes;
         match self.index.ty {
             0 => indexes = [0, 3],
             1 => indexes = [4, 1],
             2 => indexes = [5, 2],
-            _ => unimplemented!(),
+            _ => unreachable!(),
 
         }
 
