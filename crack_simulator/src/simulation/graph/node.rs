@@ -1,5 +1,7 @@
 use std::collections::{HashSet, VecDeque};
 
+use crate::simulation::graph::edge::ANGLE_PROPOGATION_CONST;
+
 use super::edge_update_list::EdgeUpdateList;
 use super::{NodeMatrix, EdgeMatrix};
 use super::stress_vec::StressVec;
@@ -107,10 +109,11 @@ impl Node {
     pub fn add_to_update_list(&self, e_update_list: &mut EdgeUpdateList, edge_matrix: &mut EdgeMatrix) -> bool {
         for oei in self.edges {
             if let Some(ei) = oei {
-                let e = edge_matrix.get(ei)
+                let e = edge_matrix.get_mut(ei)
                     .expect("shouldn't be none");
                 if !(e.get_update_status() == EdgeUpdateStatus::StressUpdate) {
                     e_update_list.push(e.index);
+                    e.set_scheduled_for_stress_update();
                 }
             }
         }
@@ -119,28 +122,29 @@ impl Node {
 }
 
 pub struct Stresses {
-    d0: f32,
-    d1: f32,
-    d2: f32,
+    stresses: [f32; 6]
 }
 
 impl Stresses {
-    fn new(d0: f32, d1: f32, d2: f32) -> Self {
+    fn new() -> Self {
         Self {
-            d0, d1, d2
+            stresses: [0_f32; 6]
         }
     }
 
     pub fn add_stress(&mut self, s: StressVec) {
         match s {
             StressVec::A0(f) => {
-                self.d0 += f;
+                self.stresses[0] += f;
+                self.stresses[3] += f;
             },
             StressVec::A1(f) => {
-                self.d1 += f;
+                self.stresses[1] += f;
+                self.stresses[4] += f;
             },
             StressVec::A2(f) => {
-                self.d2 += f;
+                self.stresses[2] += f;
+                self.stresses[5] += f;
             }
         }
     }
@@ -148,16 +152,24 @@ impl Stresses {
     pub fn get_dir_stress(&self, n: usize) -> f32 {
         debug_assert!(n < 6);
         match n {
-            0 | 3 => self.d0 + (self.d1 + self.d2) / 2.0,
-            1 | 4 => self.d1 + (self.d0 + self.d2) / 2.0,
-            2 | 5 => self.d2 + (self.d0 + self.d1) / 2.0,
+            0 => self.stresses[0] + (self.stresses[5] + self.stresses[1]) / 2.0 * ANGLE_PROPOGATION_CONST,
+            1 => self.stresses[1] + (self.stresses[0] + self.stresses[2]) / 2.0 * ANGLE_PROPOGATION_CONST,
+            2 => self.stresses[2] + (self.stresses[1] + self.stresses[3]) / 2.0 * ANGLE_PROPOGATION_CONST,
+            3 => self.stresses[3] + (self.stresses[2] + self.stresses[4]) / 2.0 * ANGLE_PROPOGATION_CONST,
+            4 => self.stresses[4] + (self.stresses[3] + self.stresses[5]) / 2.0 * ANGLE_PROPOGATION_CONST,
+            5 => self.stresses[5] + (self.stresses[4] + self.stresses[0]) / 2.0 * ANGLE_PROPOGATION_CONST,
             _ => panic!("Dir stress is not defined for undefined directions"),
         }
+    }
+
+    pub fn release_stress(&mut self, n: usize) {
+        debug_assert!(n < 6);
+        self.stresses[n] = 0_f32;
     }
 }
 
 impl Default for Stresses {
     fn default() -> Self {
-        Self::new(0_f32, 0_f32, 0_f32)
+        Self::new()
     }
 }

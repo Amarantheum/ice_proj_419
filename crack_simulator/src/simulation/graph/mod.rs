@@ -1,3 +1,5 @@
+use std::{fs::File, path::Path};
+
 use node::Node;
 use edge::Edge;
 use edge_update_list::EdgeUpdateList;
@@ -8,11 +10,13 @@ use self::{node::NodeIndex, edge::EdgeUpdateStatus};
 use self::edge::EdgeIndex;
 
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
+use std::io::Write;
 
 pub mod node;
 pub mod edge;
 mod edge_update_list;
 mod stress_vec;
+mod propagation_vector;
 
 pub struct NodeMatrix {
     v: Vec<Vec<Node>>,
@@ -106,11 +110,13 @@ impl Graph {
             }
             self.edge_matrix.v.push(cur_vec);
         }
+        debug_assert!(self.update_edge_list.size() == 0);
         for v in &self.node_matrix.v {
             for vv in v {
                 vv.add_to_update_list(&mut self.update_edge_list, &mut self.edge_matrix);
             }
         }
+        debug_assert!(self.update_edge_list.size() < self.rows * self.cols * 3);
     }
 
     #[inline]
@@ -145,15 +151,17 @@ impl Graph {
 
     pub fn update_graph_edge_stresses(&mut self) {
         let update_n = self.update_edge_list.size();
+        println!("update edge stress size: {}", update_n);
         for _ in 0..update_n {
             if let Some(e) = self.edge_matrix.get_mut(self.update_edge_list.pop().expect("shouldn't be none")) {
-                e.update_total_stress(&self.node_matrix, &mut self.update_edge_list);
+                e.update_total_stress(&mut self.node_matrix, &mut self.update_edge_list);
             }
         }
     }
 
     pub fn update_graph_stress_propagation(&mut self) {
         let update_n = self.update_edge_list.size();
+        println!("update stress propagation size: {}", update_n);
         for _ in 0..update_n {
             // get next edge
             let e = self.update_edge_list.pop()
@@ -192,6 +200,64 @@ impl Graph {
         self.update_graph_stress_propagation();
         debug_assert!(self.valid_edge_assert_not(EdgeUpdateStatus::PropogationUpdate));
     }
+
+    /*
+    print self in this style:
+    o---o---o
+     \ / \ / \
+      o---o---o
+    */
+    pub fn debug_print(&self, file: Option<&Path>) {
+        let mut output = String::new();
+        for r in 0..self.rows {
+            let mut line1 = String::new();
+            let mut line2 = String::new();
+            
+            if r % 2 != 0 {
+                line1 += "  ";
+            } else {
+                line2 += " ";
+            }
+            for c in 0..self.cols {
+                line1 += "o";
+                let n = self.node_matrix.get([r, c].into());
+                if n.edges[0].is_some() && !self.edge_matrix.get(n.edges[0].unwrap()).unwrap().cracked {
+                    line1 += "---";
+                } else {
+                    line1 += "   ";
+                }
+                if c != 0 || r % 2 != 0 {
+                    if n.edges[4].is_some() && !self.edge_matrix.get(n.edges[4].unwrap()).unwrap().cracked {
+                        line2 += " / ";
+                    } else {
+                        line2 += "   ";
+                    }
+                }
+                
+                if n.edges[5].is_some() && !self.edge_matrix.get(n.edges[5].unwrap()).unwrap().cracked {
+                    line2 += "\\";
+                } else {
+                    line2 += " ";
+                }
+            }
+            line1 += "\n";
+            line2 += "\n";
+
+            output += line1.as_str();
+            output += line2.as_str();
+        }
+        if let Some(p) = file {
+            let mut f = File::options()
+                .write(true)
+                .truncate(true)
+                .create(true)
+                .open(p)
+                .expect("failed to open file");
+            write!(f, "{}", output).unwrap();
+        } else {
+            println!("{}", output);
+        }
+    }
 }
 
 impl NodeMatrix {
@@ -220,7 +286,7 @@ mod tests {
     use rand::prelude::*;
     use std::time;
 
-    #[test]
+    //#[test]
     fn test_verify_graph() {
         let g = Graph::new(1000, 1000);
         for r in 0..g.rows {
@@ -230,10 +296,10 @@ mod tests {
         }
     }
 
-    #[test]
+    //#[test]
     fn test_update_edge_stresses() {
         let mut g = Graph::new(1080, 1920);
-        
+
         let t = time::Instant::now();
         g.update_graph_edge_stresses();
         println!("time: {}", t.elapsed().as_millis());
@@ -247,10 +313,24 @@ mod tests {
     fn test_main_loop() {
         println!("main loop");
         let mut g = Graph::new(1080, 1920);
+        assert!(g.update_edge_list.size() <= 1080 * 1920 * 3);
         for _ in 0..10 {
             let t = time::Instant::now();
             g.main_loop();
             println!("main loop time: {}", t.elapsed().as_nanos());
         }
+    }
+
+    #[test]
+    fn test_debug_print() {
+        println!("main loop");
+        let mut g = Graph::new(100, 100);
+        for _ in 0..10 {
+            let t = time::Instant::now();
+            g.main_loop();
+            println!("main loop time: {}", t.elapsed().as_nanos());
+        }
+
+        g.debug_print(Some(Path::new("test")));
     }
 }

@@ -1,10 +1,11 @@
 use std::collections::VecDeque;
 
-use super::{node::{Node, NodeIndex}, NodeMatrix, edge_update_list::EdgeUpdateList, EdgeMatrix};
+use super::{node::{Node, NodeIndex}, NodeMatrix, edge_update_list::EdgeUpdateList, EdgeMatrix, propagation_vector::PVec};
 use super::stress_vec::StressVec;
 
-const CRACK_THRESHOLD: f32 = 1.5;
-const PROPOGATION_CONST: f32 = 1.0;
+const CRACK_THRESHOLD: f32 = 1.999;
+const PROPOGATION_CONST: f32 = 0.5;
+pub const ANGLE_PROPOGATION_CONST: f32 = 0.001;
 
 #[derive(Copy, Clone, PartialEq, Debug, Default)]
 pub struct EdgeIndex {
@@ -39,8 +40,9 @@ pub struct Edge {
     /// from adjacent nodes. This value is also used
     /// when a crack occurs to propogate stress
     total_stress: f32,
-    cracked: bool,
+    pub cracked: bool,
     update_status: EdgeUpdateStatus,
+    prop_vec: PVec,
 }
 
 impl Edge {
@@ -70,7 +72,7 @@ impl Edge {
     }
 
     #[inline]
-    pub(super) fn update_total_stress(&mut self, matrix: &NodeMatrix, update_list: &mut EdgeUpdateList) {
+    pub(super) fn update_total_stress(&mut self, matrix: &mut NodeMatrix, update_list: &mut EdgeUpdateList) {
         if self.cracked { return }
         let n1 = matrix.get(self.nodes[0]);
         let n2 = matrix.get(self.nodes[0]);
@@ -97,6 +99,24 @@ impl Edge {
             self.cracked = true;
             self.set_scheduled_for_propagate_update();
             update_list.push(self.index);
+            matrix.get_mut(self.nodes[0]).stresses
+                .release_stress(
+                    match self.index.ty {
+                        0 => 0,
+                        1 => 4,
+                        2 => 5,
+                        _ => unreachable!()
+                    }
+                );
+            matrix.get_mut(self.nodes[1]).stresses
+                .release_stress(
+                    match self.index.ty {
+                        0 => 3,
+                        1 => 1,
+                        2 => 2,
+                        _ => unreachable!()
+                    }
+                );
         } else {
             self.set_not_scheduled_for_update();
         }
