@@ -1,4 +1,6 @@
+use std::i128::MIN;
 use std::{fs::File, path::Path};
+use std::cmp::min;
 
 use node::Node;
 use edge::Edge;
@@ -6,7 +8,9 @@ use edge_update_list::EdgeUpdateList;
 use rand::random;
 use rayon::{slice::{ParallelSlice, ParallelSliceMut}, current_num_threads};
 
-use self::{node::NodeIndex, edge::EdgeUpdateStatus};
+use crate::simulation::graph::edge::PROPOGATION_CONST;
+
+use self::{node::NodeIndex, edge::{EdgeUpdateStatus, CRACK_THRESHOLD}};
 use self::edge::EdgeIndex;
 
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
@@ -17,6 +21,10 @@ pub mod edge;
 mod edge_update_list;
 mod stress_vec;
 mod propagation_vector;
+
+const PROPOGATION_CUTOFF: f32 = CRACK_THRESHOLD / 1000000_f32;
+const WEAKEST_PATH_BIAS: f32 = 4_f32;
+const MIN_STRESS: f32 = 0.0000001;
 
 pub struct NodeMatrix {
     v: Vec<Vec<Node>>,
@@ -66,7 +74,7 @@ impl Graph {
         for r in 0..self.rows {
             let mut cur = Vec::with_capacity(self.cols);
             for c in 0..self.cols {
-                cur.push(Node::new(Self::get_init_implicit_node_stress(), r, c));
+                cur.push(Node::new(r, c));
             }
             self.node_matrix.v.push(cur);
         }
@@ -111,9 +119,14 @@ impl Graph {
             self.edge_matrix.v.push(cur_vec);
         }
         debug_assert!(self.update_edge_list.size() == 0);
-        for v in &self.node_matrix.v {
-            for vv in v {
-                vv.add_to_update_list(&mut self.update_edge_list, &mut self.edge_matrix);
+        for e in &mut self.edge_matrix.v {
+            for ee in e {
+                for eee in ee {
+                    if let Some(e) = eee {
+                        self.update_edge_list.push(e.index);
+                        e.set_scheduled_for_stress_update();
+                    }
+                }
             }
         }
         debug_assert!(self.update_edge_list.size() < self.rows * self.cols * 3);
@@ -141,12 +154,12 @@ impl Graph {
 
     fn get_init_implicit_node_stress() -> f32 {
         // TODO randomize here?
-        random()
+        0_f32
     }
 
     fn get_init_implicit_edge_stress() -> f32 {
         // TODO randomize here?
-        0_f32
+        random()
     }
 
     pub fn update_graph_edge_stresses(&mut self) {
@@ -159,6 +172,10 @@ impl Graph {
         }
     }
 
+    fn weak_path_bias_fn(ratio: f32) -> f32 {
+        0.5 * (WEAKEST_PATH_BIAS * (ratio - 1_f32)).tanh() + 0.5
+    }
+
     pub fn update_graph_stress_propagation(&mut self) {
         let update_n = self.update_edge_list.size();
         println!("update stress propagation size: {}", update_n);
@@ -166,22 +183,138 @@ impl Graph {
             // get next edge
             let e = self.update_edge_list.pop()
                 .expect("shouldn't be none");
-            // set not scheduled to update as long as it isn't scheduled for stress update
-            self.edge_matrix.get_mut(e).expect("shouldn't be none").set_update_status_propogated();
-            // get orthogonal nodes
-            let orth_nodes = self.edge_matrix.get(e)
-                .expect("shouldn't be none")
-                .get_orthogonal_nodes(&self.node_matrix, &self.edge_matrix);
-            // propogate stress
-            self.edge_matrix.get_mut(e)
-                .expect("shouldn't be none")
-                .propogate_stress(&mut self.node_matrix, orth_nodes, &mut self.update_edge_list);
-            // add edges to update to update list    
-            for n in orth_nodes {
-                if let Some(nn) = n {
-                    self.node_matrix.get(nn).add_to_update_list(&mut self.update_edge_list, &mut self.edge_matrix);
+            
+            /*
+                // CALCULATION WILL LOOK LIKE
+                // state
+                imp_stress
+                imp_stress_update
+                prop_vec
+                prop_vec_update
+
+                // adding new prop_vec =>
+                prop_vec_update = norm((imp_stress_update * prop_vec_update) + (new_imp_stress * new_prop_vec_update))
+                imp_stress_update += new_imp_stress
+
+                // update self
+                prop_vec = norm((imp_stress * prop_vec) + (imp_stress_update * prop_vec_update))
+                imp_stress += imp_stress_update
+                
+                // Propagation will look like:
+                angle = dot(prop_vec, a.dir)
+                a.imp_stress_update = angle * imp_stress
+                a.prop_vec_update = prop_vec
+            */
+
+            let edge = self.edge_matrix.get(e).unwrap();
+            if edge.prop_vec.is_zero() {
+                println!("prop vec ZERO index {:?}", edge.index);
+                // add cur stress in both directions
+                let mut dir = edge.ty_to_prop_vec();
+                let added_stress = edge.stress;
+
+                let adjacent_edges = Edge::get_adjacent_edges(edge.index, self.cols);
+                let mut prop_amounts: [Option<f32>; 4] = [None; 4];
+                for i in 0..4 {
+                    if let Some(e) = adjacent_edges[i] {
+                        if let Some(ee) = self.edge_matrix.get(e) {
+                            println!("EDGE {} has stress: {}", i, ee.stress);
+                            prop_amounts[i] = Some(ee.stress);
+                            // ee.add_stress_update(3_f32.sqrt() / 2.0 * added_stress * PROPOGATION_CONST, dir);
+                            // if ee.get_update_status() != EdgeUpdateStatus::StressUpdate {
+                            //     ee.set_scheduled_for_stress_update();
+                            //     self.update_edge_list.push(ee.index);
+                            // }
+                        }
+                    }
+                }
+
+                let mut i = 0;
+                for _ in 0..2 {
+                    if prop_amounts[i].is_some() && prop_amounts[i + 1].is_some() {
+                        let mut scaled_props: [f32; 2] = [0_f32; 2];
+                        // unwrapped prop_amts
+                        let prop_amounts_ = [prop_amounts[i].unwrap().max(MIN_STRESS), prop_amounts[i + 1].unwrap().max(MIN_STRESS)];
+                        scaled_props[0] = Self::weak_path_bias_fn(prop_amounts_[0] / prop_amounts_[1]);
+                        scaled_props[1] = 1_f32 - scaled_props[0];
+
+                        println!("Scaled props {:?}", scaled_props);
+                        
+                        for j in 0..2 {
+                            let e = self.edge_matrix.get_mut(adjacent_edges[i + j].unwrap()).unwrap();
+                            let amt = scaled_props[j] * added_stress * PROPOGATION_CONST;
+                            if amt > MIN_STRESS {
+                                e.add_stress_update(scaled_props[j] * added_stress * PROPOGATION_CONST, dir);
+                                if e.get_update_status() != EdgeUpdateStatus::StressUpdate {
+                                    e.set_scheduled_for_stress_update();
+                                    self.update_edge_list.push(e.index);
+                                }
+                            }
+                            
+                        }
+                    }
+                    dir = -dir;
+                    i = 2;
+                }
+                
+                
+
+            } else {
+                println!("prop non zero index: {:?}, dir: {:?}", edge.index, edge.prop_vec);
+                // propogate stress in the direction of this pvec
+                let dir = edge.prop_vec;
+                let added_stress = edge.stress;
+                
+                let adjacent_edges = Edge::get_adjacent_edges(edge.index, self.cols);
+                let inversions = match edge.index.ty {
+                    0 => [1_f32, 1_f32, -1_f32, -1_f32],
+                    1 => [-1_f32, 1_f32, -1_f32, 1_f32],
+                    2 => [1_f32, -1_f32, 1_f32, -1_f32],
+                    _ => unreachable!(),
+                };
+
+                let mut pre_prop_ratio = [(0_f32, None); 2];
+                let mut a = 0;
+                for i in 0..4 {
+                    if let Some(e) = adjacent_edges[i] {
+                        if let Some(ee) = self.edge_matrix.get_mut(e) {
+                            let amt = (ee.ty_to_prop_vec() * dir) * inversions[i];
+                            if amt > 0_f32 {
+                                println!("added edge {:?} with amt: {}", ee.index, amt);
+                                pre_prop_ratio[a] = (amt.max(MIN_STRESS), Some(e));
+                                a += 1
+                            }
+                        }
+                    }
+                }
+                debug_assert!(a < 3);
+
+                if a == 2 {
+                    println!("found 2");
+                    let mut scaled_props = [0_f32; 2];
+                    scaled_props[0] = Self::weak_path_bias_fn(pre_prop_ratio[0].0 / pre_prop_ratio[1].0);
+                    scaled_props[1] = 1_f32 - scaled_props[0];
+
+                    println!("scaled: {:?}", scaled_props);
+
+                    for i in 0..2 {
+                        let e = self.edge_matrix.get_mut(pre_prop_ratio[i].1.unwrap()).unwrap();
+                        let amt = scaled_props[i] * added_stress * PROPOGATION_CONST;
+                        if amt > MIN_STRESS {
+                            e.add_stress_update(scaled_props[i] * added_stress * PROPOGATION_CONST, dir);
+                            if e.get_update_status() != EdgeUpdateStatus::StressUpdate {
+                                e.set_scheduled_for_stress_update();
+                                self.update_edge_list.push(e.index);
+                            }
+                        }
+                        
+                    }
                 }
             }
+            let edge = self.edge_matrix.get_mut(e).unwrap();
+            edge.prop_vec = Default::default();
+            edge.stress = 0.0;
+            edge.set_update_status_propogated();
         }
     }
 
@@ -286,7 +419,7 @@ mod tests {
     use rand::prelude::*;
     use std::time;
 
-    //#[test]
+    #[test]
     fn test_verify_graph() {
         let g = Graph::new(1000, 1000);
         for r in 0..g.rows {
@@ -296,7 +429,7 @@ mod tests {
         }
     }
 
-    //#[test]
+    #[test]
     fn test_update_edge_stresses() {
         let mut g = Graph::new(1080, 1920);
 
@@ -325,10 +458,15 @@ mod tests {
     fn test_debug_print() {
         println!("main loop");
         let mut g = Graph::new(100, 100);
-        for _ in 0..10 {
+        g.main_loop();
+        g.edge_matrix.get_mut(EdgeIndex { row: 50, col: 50, ty: 0 }).unwrap().add_stress(100.0, &mut g.update_edge_list);
+        g.edge_matrix.get_mut(EdgeIndex { row: 40, col: 40, ty: 1 }).unwrap().add_stress(100.0, &mut g.update_edge_list);
+        g.edge_matrix.get_mut(EdgeIndex { row: 40, col: 60, ty: 2 }).unwrap().add_stress(100.0, &mut g.update_edge_list);
+        
+        for _ in 0..100 {
             let t = time::Instant::now();
             g.main_loop();
-            println!("main loop time: {}", t.elapsed().as_nanos());
+            println!("main loop time: {}", t.elapsed().as_micros());
         }
 
         g.debug_print(Some(Path::new("test")));
