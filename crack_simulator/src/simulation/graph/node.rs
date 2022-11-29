@@ -4,6 +4,7 @@ use super::edge_update_list::EdgeUpdateList;
 use super::{NodeMatrix, EdgeMatrix};
 use super::stress_vec::StressVec;
 use super::edge::{Edge, EdgeIndex, EdgeUpdateStatus};
+use crate::graphics::vertex::Vertex;
 
 #[derive(Copy, Clone, PartialEq, Debug, Default)]
 pub struct NodeIndex {
@@ -26,6 +27,8 @@ pub struct Node {
     pub edges: [Option<EdgeIndex>; 6],
     
     pub index: NodeIndex,
+
+    pub ndc: Option<Vertex>,
 }
 
 impl Node {
@@ -35,6 +38,10 @@ impl Node {
             index: NodeIndex { row, col },
             ..Default::default()
         }
+    }
+
+    pub fn set_ndc(&mut self, ndc: Vertex) {
+        self.ndc = Some(ndc);
     }
 
     /// Get the node adjacent to this node in direction n (n=0 => 0rad, n=1 => pi/3rad ...)

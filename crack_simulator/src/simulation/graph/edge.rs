@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 
 use super::{node::{Node, NodeIndex}, NodeMatrix, edge_update_list::EdgeUpdateList, EdgeMatrix, propagation_vector::PVec};
 use super::stress_vec::StressVec;
+use crate::graphics::vertex::Vertex;
 
 use rand::random;
 
@@ -112,7 +113,7 @@ impl Edge {
     }
 
     #[inline]
-    pub(super) fn update_total_stress(&mut self, matrix: &mut NodeMatrix, update_list: &mut EdgeUpdateList) {
+    pub(super) fn update_total_stress(&mut self, matrix: &mut NodeMatrix, update_list: &mut EdgeUpdateList) -> bool {
         if self.cracked {
             debug_assert!(self.stress == 0_f32);
             if self.stress_update != 0_f32 {
@@ -121,7 +122,7 @@ impl Edge {
                 self.set_scheduled_for_propagate_update();
                 update_list.push(self.index);
             }
-            return;
+            return false;
         }
         self.commit_updates();
 
@@ -139,8 +140,10 @@ impl Edge {
             
             self.set_scheduled_for_propagate_update();
             update_list.push(self.index);
+            true
         } else {
             self.set_not_scheduled_for_update();
+            false
         }
     }
 
