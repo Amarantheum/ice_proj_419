@@ -24,7 +24,7 @@ mod stress_vec;
 mod propagation_vector;
 
 const PROPOGATION_CUTOFF: f32 = CRACK_THRESHOLD / 1000000_f32;
-const WEAKEST_PATH_BIAS: f32 = 3_f32;
+const WEAKEST_PATH_BIAS: f32 = 1.5_f32;
 const MIN_STRESS: f32 = 0.0000001;
 
 pub struct NodeMatrix {
@@ -307,13 +307,13 @@ impl Graph {
                         // unwrapped prop_amts
                         let prop_amounts_ = [prop_amounts[i].unwrap().max(MIN_STRESS), prop_amounts[i + 1].unwrap().max(MIN_STRESS)];
                         scaled_props[0] = Self::weak_path_bias_fn(prop_amounts_[0] / prop_amounts_[1]);
-                        scaled_props[1] = 1_f32 - scaled_props[0];
+                        scaled_props[1] = Self::weak_path_bias_fn(prop_amounts_[1] / prop_amounts_[0]);
 
                         //println!("Scaled props {:?}", scaled_props);
                         
                         for j in 0..2 {
                             let e = self.edge_matrix.get_mut(adjacent_edges[i + j].unwrap()).unwrap();
-                            let amt = scaled_props[j] * added_stress * PROPOGATION_CONST;
+                            let amt = scaled_props[j] * added_stress * PROPOGATION_CONST / 2.0; // divide by 2 cuz half goes in each direction
                             if amt > MIN_STRESS {
                                 e.add_stress_update(scaled_props[j] * added_stress * PROPOGATION_CONST, dir);
                                 if e.get_update_status() != EdgeUpdateStatus::StressUpdate {
@@ -364,7 +364,7 @@ impl Graph {
                     //println!("found 2");
                     let mut scaled_props = [0_f32; 2];
                     scaled_props[0] = Self::weak_path_bias_fn(pre_prop_ratio[0].0 / pre_prop_ratio[1].0);
-                    scaled_props[1] = 1_f32 - scaled_props[0];
+                    scaled_props[1] = Self::weak_path_bias_fn(pre_prop_ratio[1].0 / pre_prop_ratio[0].0);
 
                     //println!("scaled: {:?}", scaled_props);
 
@@ -541,5 +541,51 @@ mod tests {
         }
 
         g.debug_print(Some(Path::new("test")));
+    }
+
+    #[test]
+    fn test_get_adjacent_edges_rand() {
+        let g = Graph::new(100, 100);
+        for e in &g.edge_matrix.v {
+            for ee in e {
+                for i in 0..3 {
+                    if let Some(edge) = ee[i].as_ref() {
+                        if edge.index.col != 0 && edge.index.col != 99 && edge.index.row != 0 && edge.index.row != 99 {
+                            let adjacent_edges = Edge::get_adjacent_edges(edge.index, g.cols);
+                            let e1;
+                            let e2;
+                            let e3;
+                            let e4;
+                            match i {
+                                0 => {
+                                    e1 = g.node_matrix.get(edge.nodes[0]).edges[1];
+                                    e2 = g.node_matrix.get(edge.nodes[1]).edges[2];
+                                    e3 = g.node_matrix.get(edge.nodes[0]).edges[5];
+                                    e4 = g.node_matrix.get(edge.nodes[1]).edges[4];
+                                },
+                                1 => {
+                                    e1 = g.node_matrix.get(edge.nodes[1]).edges[2];
+                                    e2 = g.node_matrix.get(edge.nodes[0]).edges[3];
+                                    e3 = g.node_matrix.get(edge.nodes[1]).edges[0];
+                                    e4 = g.node_matrix.get(edge.nodes[0]).edges[5];
+                                },
+                                2 => {
+                                    e1 = g.node_matrix.get(edge.nodes[0]).edges[0];
+                                    e2 = g.node_matrix.get(edge.nodes[1]).edges[1];
+                                    e3 = g.node_matrix.get(edge.nodes[0]).edges[4];
+                                    e4 = g.node_matrix.get(edge.nodes[1]).edges[3];
+                                },
+                                _ => unreachable!(),
+                            }
+                            assert_eq!(adjacent_edges[0], e1);
+                            assert_eq!(adjacent_edges[1], e2);
+                            assert_eq!(adjacent_edges[2], e3);
+                            assert_eq!(adjacent_edges[3], e4);
+                        }
+                    }
+                }
+                
+            }
+        }
     }
 }

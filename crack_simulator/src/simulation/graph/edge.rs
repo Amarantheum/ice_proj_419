@@ -7,8 +7,8 @@ use crate::graphics::vertex::Vertex;
 use rand::random;
 
 pub const CRACK_THRESHOLD: f32 = 1.9;
-pub const PROPOGATION_CONST: f32 = 0.9;
-const DIR_PROPAGATION: f32 = 10.0;
+pub const PROPOGATION_CONST: f32 = 0.85;
+const DIR_PROPAGATION: f32 = 3.0;
 
 #[derive(Copy, Clone, PartialEq, Debug, Default)]
 pub struct EdgeIndex {
@@ -75,7 +75,7 @@ impl Edge {
         }
     }
 
-    fn combine_stress(s: &mut f32, v: &mut PVec, stress: f32, dir: PVec, bias: f32) {
+    fn combine_stress(s: &mut f32, v: &mut PVec, stress: f32, dir: PVec) {
         if dir.is_zero() || stress == 0_f32 {
             return;
         }
@@ -86,19 +86,19 @@ impl Edge {
         }
         debug_assert!((v.modulus() * 100_f32).round() == 100.0);
         debug_assert!((dir.modulus() * 100_f32).round() == 100.0);
-        *v = (v.scale(*s * bias) + dir.scale(stress / bias)).norm();
+        *v = (v.scale(*s) + dir.scale(stress)).norm();
         *s += stress;
     }
 
     #[inline]
     pub fn add_stress_update(&mut self, stress: f32, dir: PVec) {
-        Self::combine_stress(&mut self.stress_update, &mut self.prop_vec_update, stress, dir, 1.0);
+        Self::combine_stress(&mut self.stress_update, &mut self.prop_vec_update, stress, dir);
     }
 
     /// Update self.stress and self.prop_vec with incomming updates
     #[inline]
     fn commit_updates(&mut self) {
-        Self::combine_stress(&mut self.stress, &mut self.prop_vec, self.stress_update, self.prop_vec_update, 1.0);
+        Self::combine_stress(&mut self.stress, &mut self.prop_vec, self.stress_update, self.prop_vec_update);
         debug_assert!({
             if !((self.prop_vec.modulus() * 100_f32).round() == 100.0) && !self.prop_vec.is_zero() {
                 println!("got bad mod: {}", self.prop_vec.modulus());
@@ -222,28 +222,6 @@ impl Edge {
         }
     }
 
-    #[inline]
-    pub(super) fn get_orthogonal_nodes(&self, n_matrix: &NodeMatrix, e_matrix: &EdgeMatrix) -> [Option<NodeIndex>; 2] {
-        match self.index.ty {
-            0 => {
-                let upper_node = n_matrix.get(self.nodes[0]).get_adjacent_node_n(1, e_matrix);
-                let lower_node = n_matrix.get(self.nodes[0]).get_adjacent_node_n(5, e_matrix);
-                [upper_node, lower_node]
-            },
-            1 => {
-                let upper_node = n_matrix.get(self.nodes[0]).get_adjacent_node_n(3, e_matrix);
-                let lower_node = n_matrix.get(self.nodes[0]).get_adjacent_node_n(5, e_matrix);
-                [upper_node, lower_node]
-            },
-            2 => {
-                let upper_node = n_matrix.get(self.nodes[0]).get_adjacent_node_n(0, e_matrix);
-                let lower_node = n_matrix.get(self.nodes[0]).get_adjacent_node_n(4, e_matrix);
-                [upper_node, lower_node]
-            },
-            _ => unreachable!(),
-        }
-    }
-
     pub fn ty_to_prop_vec(&self) -> PVec {
         match self.index.ty {
             0 => PVec::new(0.0, 1.0),
@@ -252,26 +230,6 @@ impl Edge {
             _ => unreachable!(),
         }
     }
-
-    fn ty_to_vec(&self, stress: f32) -> StressVec {
-        match self.index.ty {
-            0 | 3 => StressVec::A0(stress),
-            1 | 4 => StressVec::A1(stress),
-            2 | 5 => StressVec::A2(stress),
-            _ => unreachable!(),
-        }
-    }
-
-    // pub(super) fn propogate_stress(&mut self, n_matrix: &mut NodeMatrix, orth_nodes: [Option<NodeIndex>; 2], e_update_list: &mut EdgeUpdateList) {
-    //     if !self.cracked || self.total_stress == 0.0 {
-    //         return;
-    //     }
-    //     for n in orth_nodes {
-    //         if let Some(nn) = n {
-    //             n_matrix.get_mut(nn).stresses.add_stress(self.ty_to_vec(self.total_stress * PROPOGATION_CONST));
-    //         }
-    //     }
-    // }
 
     pub fn verify(&self, n_matrix: &NodeMatrix) {
         let indexes;

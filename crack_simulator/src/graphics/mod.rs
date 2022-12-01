@@ -60,9 +60,9 @@ impl SimulationScreen {
 
         //target.draw(&vertex_buffer, &indices, &crack_shader_program, &uniform! {}, &Default::default()).unwrap();
         target.finish().unwrap();
-        graph.add_stress(EdgeIndex { row: 500, col: 500, ty: 2 }, 100.0).unwrap();
-        graph.add_stress(EdgeIndex { row: 500, col: 1000, ty: 1 }, 10000.0).unwrap();
-        graph.add_stress(EdgeIndex { row: 500, col: 1500, ty: 1 }, 100.0).unwrap();
+        //graph.add_stress(EdgeIndex { row: 500, col: 500, ty: 2 }, 100.0).unwrap();
+        graph.add_stress(EdgeIndex { row: 500, col: 1000, ty: 0 }, 100.0).unwrap();
+        //graph.add_stress(EdgeIndex { row: 500, col: 1500, ty: 1 }, 100.0).unwrap();
 
         Self {
             event_loop,
