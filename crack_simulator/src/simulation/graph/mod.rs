@@ -23,7 +23,6 @@ mod edge_update_list;
 mod stress_vec;
 mod propagation_vector;
 
-const PROPOGATION_CUTOFF: f32 = CRACK_THRESHOLD / 1000000_f32;
 const WEAKEST_PATH_BIAS: f32 = 1.5_f32;
 const MIN_STRESS: f32 = 0.0000001;
 
@@ -76,7 +75,6 @@ impl Graph {
         for r in 0..self.rows {
             let mut cur = Vec::with_capacity(self.cols);
             for c in 0..self.cols {
-                let row_height = 
                 cur.push(Node::new(r, c));
             }
             self.node_matrix.v.push(cur);
@@ -195,6 +193,10 @@ impl Graph {
     fn get_init_implicit_edge_stress() -> f32 {
         // TODO randomize here?
         random()
+    }
+
+    pub fn get_update_amt(&self) -> usize {
+        self.update_edge_list.size()
     }
 
     pub fn update_graph_edge_stresses(&mut self, mut triangle_update_list: Option<&mut Vec<Vertex>>) {
