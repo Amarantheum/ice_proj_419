@@ -76,11 +76,6 @@ function bang() {
 	outlet(5, count);
 }
 
-function msg_float(intensity) {
-	// float input 1.0 to 2.0
-	iMod = intensity;
-}
-
 function countMsg() {
 	// output number of chords in array
 	outlet(6, chordArr.length);
