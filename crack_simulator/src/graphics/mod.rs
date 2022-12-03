@@ -12,6 +12,7 @@ use glium::{Display, Surface, Program, VertexBuffer};
 use glium::uniform;
 use vertex::Vertex;
 use crate::simulation::graph::edge::EdgeIndex;
+use rand::random;
 
 use crate::simulation::graph::Graph;
 
@@ -28,14 +29,17 @@ pub struct SimulationScreen {
     
     crack_shader_program: Program,
     screen_shader_program: Program,
-    texture: SrgbTexture2d,
+    //bloom_shader_program: Program,
+    crack_texture: SrgbTexture2d,
+    //bloom_texture: SrgbTexture2d,
 
     graph: Graph,
     crack_color: [f32; 4],
+    crack_update_list: Arc<Mutex<VecDeque<f32>>>,
 }
 
 impl SimulationScreen {
-    pub fn new(width: u32, height: u32) -> Self {
+    pub fn new(width: u32, height: u32, crack_update_list: Arc<Mutex<VecDeque<f32>>>) -> Self {
         let t = std::time::Instant::now();
         println!("Building graph...");
         let mut graph = Graph::new((height as f32 / 3_f32.sqrt() * 2_f32).ceil() as usize, width as usize + 1);
@@ -50,11 +54,17 @@ impl SimulationScreen {
             .with_multisampling(8);
         let display = glium::Display::new(wb, cb, &event_loop).unwrap();
 
-        let texture = SrgbTexture2d::empty(&display, width * 4, height * 4)
+        let crack_texture = SrgbTexture2d::empty(&display, width * 4, height * 4)
             .expect("failed to create texture");
-        let mut frame_buf = SimpleFrameBuffer::new(&display, &texture)
+        let mut frame_buf = SimpleFrameBuffer::new(&display, &crack_texture)
             .expect("failed to create frame buffer");
         frame_buf.clear_color(0.0, 0.0, 0.0, 0.0);
+
+        // let bloom_texture = SrgbTexture2d::empty(&display, width, height)
+        //     .expect("failed to create texture");
+        // let mut frame_buf = SimpleFrameBuffer::new(&display, &bloom_texture)
+        //     .expect("failed to create frame buffer");
+        // frame_buf.clear_color(0.0, 0.0, 0.0, 0.0);
 
         // initialize screen with black
         let mut target = display.draw();
@@ -64,12 +74,13 @@ impl SimulationScreen {
         target.finish().unwrap();
         
         
-        graph.add_stress(EdgeIndex { row: 500, col: 500, ty: 2 }, 50.0).unwrap();
-        graph.add_stress(EdgeIndex { row: 500, col: 1000, ty: 0 }, 100.0).unwrap();
-        graph.add_stress(EdgeIndex { row: 500, col: 1500, ty: 1 }, 50.0).unwrap();
+        // graph.add_stress(EdgeIndex { row: 500, col: 500, ty: 2 }, 50.0).unwrap();
+        // graph.add_stress(EdgeIndex { row: 500, col: 1000, ty: 0 }, 100.0).unwrap();
+        // graph.add_stress(EdgeIndex { row: 500, col: 1500, ty: 1 }, 50.0).unwrap();
 
         let crack_shader_program = Self::init_crack_program(&display);
         let screen_shader_program = Self::init_screen_program(&display);
+        let bloom_shader_program = Self::init_bloom_program(&display);
         Self {
             event_loop,
             display,
@@ -80,10 +91,13 @@ impl SimulationScreen {
 
             crack_shader_program,
             screen_shader_program,
+            //bloom_shader_program,
 
             graph,
-            texture,
-            crack_color: [1.0, 0.0, 1.0, 1.0],
+            crack_texture,
+            //bloom_texture,
+            crack_color: [0.53, 0.81, 1.0, 1.0],
+            crack_update_list,
         }
     }
 
@@ -100,26 +114,52 @@ impl SimulationScreen {
         glium::Program::from_source(display, vertex_shader_src, fragment_shader_src, None).unwrap()
     }
 
+    fn init_bloom_program(display: &Display) -> Program {
+        let vertex_shader_src: &str = include_str!("./shaders/bloom_vs.glsl");
+        let fragment_shader_src: &str = include_str!("./shaders/bloom_fs.glsl");
+        glium::Program::from_source(display, vertex_shader_src, fragment_shader_src, None).unwrap()
+    }
+
+    fn get_random_edge_index(width: usize, height: usize) -> EdgeIndex {
+        EdgeIndex { row: random::<usize>() % width - 2 + 1, col: random::<usize>() % height - 2 + 1, ty: random::<usize>() % 3 }
+    }
+
+    const MAX_STRESS: f32 = 10000.0;
     pub fn run(mut self) {
         let mut time = std::time::Instant::now();
         self.event_loop.run(move |ev, _, control_flow| {
+            let mut update_list = self.crack_update_list.lock().unwrap();
+            while let Some(v) = update_list.pop_front() {
+                let pre = (v - 500.0).min(Self::MAX_STRESS);
+                let post = (pre / 500.0).powf(2_f32) * Self::MAX_STRESS;
+                println!("post: {}", post);
+                self.graph.add_stress(self.graph.get_random_edge_index(), post).unwrap();
+            }
+            drop(update_list);
             if time.elapsed().as_nanos() > 16_666_667 {
                 time =std::time::Instant::now();
-
+                let default_vbo: VertexBuffer<Vertex> = glium::VertexBuffer::new(&self.display, &vec![[-1_f32, -1_f32].into(), [1_f32, 1_f32].into(), [-1_f32, 1_f32].into(), [-1_f32, -1_f32].into(), [1_f32, 1_f32].into(), [1_f32, -1_f32].into()]).unwrap();
                 let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
                 if self.graph.get_update_amt() != 0 {
                     self.graph.update_graph_edge_stresses(Some(&mut self.vertice_update_list));
                     let vertex_buffer = glium::VertexBuffer::new(&self.display, &self.vertice_update_list).unwrap();
-                    let mut frame_buf = SimpleFrameBuffer::new(&self.display, &self.texture)
+                    let mut frame_buf = SimpleFrameBuffer::new(&self.display, &self.crack_texture)
                         .expect("failed to create frame buffer");
 
                     frame_buf.draw(&vertex_buffer, &indices, &self.crack_shader_program, &uniform! {}, &Default::default())
                         .expect("failed to draw frame");
+
+                    // let mut frame_buf = SimpleFrameBuffer::new(&self.display, &self.bloom_texture)
+                    //     .expect("failed to create frame buffer");
+
+                    // frame_buf.draw(&default_vbo, &indices, &self.bloom_shader_program, &uniform! {crack_texture: &self.bloom_texture, crack_color: self.crack_color, bloom_size: 8, scale: 1920_f32}, &Default::default())
+                    //     .expect("failed to draw frame");
                 }
                 
                 let mut target = self.display.draw();
-                let vertex_buffer: VertexBuffer<Vertex> = glium::VertexBuffer::new(&self.display, &vec![[-1_f32, -1_f32].into(), [1_f32, 1_f32].into(), [-1_f32, 1_f32].into(), [-1_f32, -1_f32].into(), [1_f32, 1_f32].into(), [1_f32, -1_f32].into()]).unwrap();
-                target.draw(&vertex_buffer, &indices, &self.screen_shader_program, &uniform! {crack_texture: &self.texture, crack_color: self.crack_color}, &Default::default()).unwrap();
+                //target.draw(&vertex_buffer, &indices, &self.screen_shader_program, &uniform! {crack_texture: &self.texture, crack_color: self.crack_color}, &Default::default()).unwrap();
+                target.draw(&default_vbo, &indices, &self.screen_shader_program, &uniform! {crack_texture: &self.crack_texture, crack_color: self.crack_color}, &Default::default())
+                    .expect("failed to draw frame");
                 target.finish().unwrap();
                 self.vertice_update_list = Vec::with_capacity(256);
                 self.graph.update_graph_stress_propagation();

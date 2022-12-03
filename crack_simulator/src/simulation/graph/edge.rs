@@ -3,12 +3,10 @@ use std::collections::VecDeque;
 use super::{node::{Node, NodeIndex}, NodeMatrix, edge_update_list::EdgeUpdateList, EdgeMatrix, propagation_vector::PVec};
 use super::stress_vec::StressVec;
 use crate::graphics::vertex::Vertex;
+use super::CRACK_THRESHOLD;
+use super::DIR_PROPAGATION;
 
 use rand::random;
-
-pub const CRACK_THRESHOLD: f32 = 1.9;
-pub const PROPOGATION_CONST: f32 = 0.85;
-const DIR_PROPAGATION: f32 = 3.0;
 
 #[derive(Copy, Clone, PartialEq, Debug, Default)]
 pub struct EdgeIndex {
@@ -135,7 +133,7 @@ impl Edge {
                 if crack_adjustment * self.prop_vec < 0_f32 {
                     crack_adjustment = - crack_adjustment;
                 }
-                self.prop_vec = (self.prop_vec + crack_adjustment.scale(DIR_PROPAGATION * random::<f32>())).norm();
+                self.prop_vec = (self.prop_vec + crack_adjustment.scale(DIR_PROPAGATION * random::<f32>() * self.stress)).norm();
             }
             
             self.set_scheduled_for_propagate_update();

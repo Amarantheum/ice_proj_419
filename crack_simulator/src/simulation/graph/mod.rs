@@ -9,9 +9,8 @@ use rand::random;
 use rayon::{slice::{ParallelSlice, ParallelSliceMut}, current_num_threads};
 use crate::graphics::vertex::Vertex;
 
-use crate::simulation::graph::edge::PROPOGATION_CONST;
 
-use self::{node::NodeIndex, edge::{EdgeUpdateStatus, CRACK_THRESHOLD}};
+use self::{node::NodeIndex, edge::{EdgeUpdateStatus}};
 use self::edge::EdgeIndex;
 
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
@@ -23,7 +22,12 @@ mod edge_update_list;
 mod stress_vec;
 mod propagation_vector;
 
-const WEAKEST_PATH_BIAS: f32 = 1.5_f32;
+const WEAKEST_PATH_BIAS: f32 = 3_f32;
+const CRACK_THRESHOLD: f32 = 1.8_f32;
+const PROPOGATION_CONST: f32 = 0.85;
+const DIR_PROPAGATION: f32 = 3.0;
+
+
 const MIN_STRESS: f32 = 0.0000001;
 
 pub struct NodeMatrix {
@@ -232,13 +236,11 @@ impl Graph {
                                             for i in 0..3 {
                                                 l.push(self.node_matrix.get(ns[i]).ndc.expect("shouldn't be none"));
                                             }
-                                            
                                         }
                                     }
                                 }
                             }
                         }
-                        
                     }
                 }
             }
@@ -303,7 +305,9 @@ impl Graph {
                 }
 
                 let mut i = 0;
-                for _ in 0..2 {
+                let bias: f32 = random();
+                let biases = [bias, 1.0 - bias];
+                for n in 0..2 {
                     if prop_amounts[i].is_some() && prop_amounts[i + 1].is_some() {
                         let mut scaled_props: [f32; 2] = [0_f32; 2];
                         // unwrapped prop_amts
@@ -315,7 +319,7 @@ impl Graph {
                         
                         for j in 0..2 {
                             let e = self.edge_matrix.get_mut(adjacent_edges[i + j].unwrap()).unwrap();
-                            let amt = scaled_props[j] * added_stress * PROPOGATION_CONST / 2.0; // divide by 2 cuz half goes in each direction
+                            let amt = scaled_props[j] * added_stress * PROPOGATION_CONST * biases[n]; // divide by 2 cuz half goes in each direction
                             if amt > MIN_STRESS {
                                 e.add_stress_update(scaled_props[j] * added_stress * PROPOGATION_CONST, dir);
                                 if e.get_update_status() != EdgeUpdateStatus::StressUpdate {
@@ -463,6 +467,10 @@ impl Graph {
         } else {
             println!("{}", output);
         }
+    }
+
+    pub fn get_random_edge_index(&self) -> EdgeIndex {
+        EdgeIndex { row: (random::<usize>() % self.rows + 1) - 2, col: (random::<usize>() % self.cols + 1) - 2, ty: random::<usize>() % 3 }
     }
 }
 
