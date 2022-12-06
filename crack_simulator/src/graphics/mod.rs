@@ -5,6 +5,7 @@ use glium::framebuffer::{RenderBuffer, SimpleFrameBuffer};
 use glium::glutin::dpi::LogicalSize;
 use glium::glutin::event::ElementState;
 use glium::glutin::event_loop::{ControlFlow, EventLoopWindowTarget};
+use glium::glutin::platform::run_return::EventLoopExtRunReturn;
 use glium::glutin::window::Fullscreen;
 use glium::glutin::{self, event_loop::EventLoop, event::Event};
 use glium::texture::SrgbTexture2d;
@@ -36,6 +37,7 @@ pub struct SimulationScreen {
     graph: Graph,
     crack_color: [f32; 4],
     crack_update_list: Arc<Mutex<VecDeque<f32>>>,
+    count: usize,
 }
 
 impl SimulationScreen {
@@ -96,8 +98,9 @@ impl SimulationScreen {
             graph,
             crack_texture,
             //bloom_texture,
-            crack_color: [0.53, 0.81, 1.0, 1.0],
+            crack_color: [0.5, 1.0, 1.0, 1.0],
             crack_update_list,
+            count: 0,
         }
     }
 
@@ -130,10 +133,17 @@ impl SimulationScreen {
         self.event_loop.run(move |ev, _, control_flow| {
             let mut update_list = self.crack_update_list.lock().unwrap();
             while let Some(v) = update_list.pop_front() {
-                let pre = (v - 500.0).min(Self::MAX_STRESS);
-                let post = (pre / 500.0).powf(2_f32) * Self::MAX_STRESS;
+                let pre = (v - 500.0 + 31.0).min(Self::MAX_STRESS);
+                let post = (pre / 500.0).powf(2.5_f32) * Self::MAX_STRESS;
                 println!("post: {}", post);
                 self.graph.add_stress(self.graph.get_random_edge_index(), post).unwrap();
+
+                if self.count < 47 {
+                    self.crack_color[0] -= 0.5 / 47_f32;
+                    self.crack_color[1] -= 1.0 / 47_f32;
+                }
+                self.count += 1;
+                println!("color: {:?}", self.crack_color);
             }
             drop(update_list);
             if time.elapsed().as_nanos() > 16_666_667 {

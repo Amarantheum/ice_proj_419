@@ -6,14 +6,11 @@ use node::Node;
 use edge::Edge;
 use edge_update_list::EdgeUpdateList;
 use rand::random;
-use rayon::{slice::{ParallelSlice, ParallelSliceMut}, current_num_threads};
 use crate::graphics::vertex::Vertex;
 
 
 use self::{node::NodeIndex, edge::{EdgeUpdateStatus}};
 use self::edge::EdgeIndex;
-
-use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use std::io::Write;
 
 pub mod node;
