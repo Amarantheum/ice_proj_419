@@ -37,7 +37,8 @@ pub fn read_watch_task(crack_update_buf: Arc<Mutex<VecDeque<f32>>>, stop: Arc<Mu
             .expect("failed to parse audio_ip as an ipv4 address"),
         settings.watch_port
     );
-    let watch_socket = UdpSocket::bind(watch_src).unwrap();
+    let watch_socket = UdpSocket::bind(watch_src)
+        .expect(format!("failed to bined to socket {:?}", watch_src).as_str());
 
     let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {                     
         addr: "/start".to_string(),

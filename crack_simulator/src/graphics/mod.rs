@@ -1,23 +1,18 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
-use glium::framebuffer::{RenderBuffer, SimpleFrameBuffer};
+use glium::framebuffer::SimpleFrameBuffer;
 use glium::glutin::dpi::LogicalSize;
 use glium::glutin::event::ElementState;
-use glium::glutin::event_loop::{ControlFlow, EventLoopWindowTarget};
-use glium::glutin::platform::run_return::EventLoopExtRunReturn;
 use glium::glutin::window::Fullscreen;
-use glium::glutin::{self, event_loop::EventLoop, event::Event};
+use glium::glutin::{self, event_loop::EventLoop};
 use glium::texture::SrgbTexture2d;
 use glium::{Display, Surface, Program, VertexBuffer};
 use glium::uniform;
 use vertex::Vertex;
-use crate::simulation::graph::edge::EdgeIndex;
-use rand::random;
 
 use crate::simulation::graph::Graph;
 
-mod polygon;
 pub mod vertex;
 
 pub struct SimulationScreen {
@@ -30,9 +25,11 @@ pub struct SimulationScreen {
     
     crack_shader_program: Program,
     screen_shader_program: Program,
-    //bloom_shader_program: Program,
+    bloom_shader_program: Program,
     crack_texture: SrgbTexture2d,
-    //bloom_texture: SrgbTexture2d,
+    bloom_texture: SrgbTexture2d,
+
+    bloom_mix: f32,
 
     graph: Graph,
     crack_color: [f32; 4],
@@ -62,11 +59,11 @@ impl SimulationScreen {
             .expect("failed to create frame buffer");
         frame_buf.clear_color(0.0, 0.0, 0.0, 0.0);
 
-        // let bloom_texture = SrgbTexture2d::empty(&display, width, height)
-        //     .expect("failed to create texture");
-        // let mut frame_buf = SimpleFrameBuffer::new(&display, &bloom_texture)
-        //     .expect("failed to create frame buffer");
-        // frame_buf.clear_color(0.0, 0.0, 0.0, 0.0);
+        let bloom_texture = SrgbTexture2d::empty(&display, width, height)
+            .expect("failed to create texture");
+        let mut frame_buf = SimpleFrameBuffer::new(&display, &bloom_texture)
+            .expect("failed to create frame buffer");
+        frame_buf.clear_color(0.0, 0.0, 0.0, 0.0);
 
         // initialize screen with black
         let mut target = display.draw();
@@ -93,11 +90,12 @@ impl SimulationScreen {
 
             crack_shader_program,
             screen_shader_program,
-            //bloom_shader_program,
+            bloom_shader_program,
 
             graph,
             crack_texture,
-            //bloom_texture,
+            bloom_texture,
+            bloom_mix: 0_f32,
             crack_color: [0.5, 1.0, 1.0, 1.0],
             crack_update_list,
             count: 0,
@@ -123,10 +121,6 @@ impl SimulationScreen {
         glium::Program::from_source(display, vertex_shader_src, fragment_shader_src, None).unwrap()
     }
 
-    fn get_random_edge_index(width: usize, height: usize) -> EdgeIndex {
-        EdgeIndex { row: random::<usize>() % width - 2 + 1, col: random::<usize>() % height - 2 + 1, ty: random::<usize>() % 3 }
-    }
-
     const MAX_STRESS: f32 = 10000.0;
     pub fn run(mut self) {
         let mut time = std::time::Instant::now();
@@ -150,6 +144,8 @@ impl SimulationScreen {
                 time =std::time::Instant::now();
                 let default_vbo: VertexBuffer<Vertex> = glium::VertexBuffer::new(&self.display, &vec![[-1_f32, -1_f32].into(), [1_f32, 1_f32].into(), [-1_f32, 1_f32].into(), [-1_f32, -1_f32].into(), [1_f32, 1_f32].into(), [1_f32, -1_f32].into()]).unwrap();
                 let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
+                
+                self.bloom_mix = (self.graph.get_update_amt() as f32 / 100_f32).min(0.5).max(0.1);
                 if self.graph.get_update_amt() != 0 {
                     self.graph.update_graph_edge_stresses(Some(&mut self.vertice_update_list));
                     let vertex_buffer = glium::VertexBuffer::new(&self.display, &self.vertice_update_list).unwrap();
@@ -159,16 +155,16 @@ impl SimulationScreen {
                     frame_buf.draw(&vertex_buffer, &indices, &self.crack_shader_program, &uniform! {}, &Default::default())
                         .expect("failed to draw frame");
 
-                    // let mut frame_buf = SimpleFrameBuffer::new(&self.display, &self.bloom_texture)
-                    //     .expect("failed to create frame buffer");
+                    let mut frame_buf = SimpleFrameBuffer::new(&self.display, &self.bloom_texture)
+                        .expect("failed to create frame buffer");
 
-                    // frame_buf.draw(&default_vbo, &indices, &self.bloom_shader_program, &uniform! {crack_texture: &self.bloom_texture, crack_color: self.crack_color, bloom_size: 8, scale: 1920_f32}, &Default::default())
-                    //     .expect("failed to draw frame");
+                    frame_buf.draw(&default_vbo, &indices, &self.bloom_shader_program, &uniform! {crack_texture: &self.crack_texture, scale: 2_f32 * 1920_f32}, &Default::default())
+                        .expect("failed to draw frame");
                 }
-                
+
                 let mut target = self.display.draw();
                 //target.draw(&vertex_buffer, &indices, &self.screen_shader_program, &uniform! {crack_texture: &self.texture, crack_color: self.crack_color}, &Default::default()).unwrap();
-                target.draw(&default_vbo, &indices, &self.screen_shader_program, &uniform! {crack_texture: &self.crack_texture, crack_color: self.crack_color}, &Default::default())
+                target.draw(&default_vbo, &indices, &self.screen_shader_program, &uniform! {crack_texture: &self.crack_texture, bloom_texture: &self.bloom_texture, crack_color: self.crack_color, bloom_mix: self.bloom_mix}, &Default::default())
                     .expect("failed to draw frame");
                 target.finish().unwrap();
                 self.vertice_update_list = Vec::with_capacity(256);

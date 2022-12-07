@@ -1,6 +1,4 @@
-use std::i128::MIN;
 use std::{fs::File, path::Path};
-use std::cmp::min;
 
 use node::Node;
 use edge::Edge;
@@ -16,13 +14,14 @@ use std::io::Write;
 pub mod node;
 pub mod edge;
 mod edge_update_list;
-mod stress_vec;
 mod propagation_vector;
 
 const WEAKEST_PATH_BIAS: f32 = 3_f32;
 const CRACK_THRESHOLD: f32 = 1.8_f32;
 const PROPOGATION_CONST: f32 = 0.85;
 const DIR_PROPAGATION: f32 = 3.0;
+
+const CRACKED_STRESS_REP: f32 = 1.0;
 
 
 const MIN_STRESS: f32 = 0.0000001;
@@ -134,21 +133,25 @@ impl Graph {
         debug_assert!(self.update_edge_list.size() < self.rows * self.cols * 3);
     }
 
+    #[allow(unused)]
     #[inline]
     pub fn get_node(&self, i: NodeIndex) -> &Node {
         self.node_matrix.get(i)
     }
 
+    #[allow(unused)]
     #[inline]
     pub fn get_node_mut(&mut self, i: NodeIndex) -> &mut Node {
         self.node_matrix.get_mut(i)
     }
 
+    #[allow(unused)]
     #[inline]
     pub fn get_edge(&self, i: EdgeIndex) -> Option<&Edge> {
         self.edge_matrix.get(i)
     }
     
+    #[allow(unused)]
     #[inline]
     pub fn get_edge_mut(&mut self, i: EdgeIndex) -> Option<&mut Edge> {
         self.edge_matrix.get_mut(i)
@@ -172,7 +175,6 @@ impl Graph {
     /// * `x_scale` - The scale of the node grid along the x axis measured in edge lengths
     /// * `y_scale` - The scale of the node grid along the y axis measured in edge lengths
     pub fn set_node_ndcs(&mut self, x_offset: f32, y_offset: f32, x_scale: f32, y_scale: f32) {
-        let row_scale = 3_f32.sqrt() / 2_f32 * y_scale;
         for r in 0..self.rows {
             let row_ndc = 1_f32 - 2_f32 * ((r as f32 + y_offset) * 3_f32.sqrt() / 2_f32 * y_scale);
             for c in 0..self.cols {
@@ -184,11 +186,6 @@ impl Graph {
                 self.node_matrix.get_mut([r, c].into()).set_ndc([col_ndc, row_ndc].into());
             }
         }
-    }
-
-    fn get_init_implicit_node_stress() -> f32 {
-        // TODO randomize here?
-        0_f32
     }
 
     fn get_init_implicit_edge_stress() -> f32 {
@@ -205,7 +202,7 @@ impl Graph {
         //println!("update edge stress size: {}", update_n);
         for _ in 0..update_n {
             if let Some(e) = self.edge_matrix.get_mut(self.update_edge_list.pop().expect("shouldn't be none")) {
-                if e.update_total_stress(&mut self.node_matrix, &mut self.update_edge_list) {
+                if e.update_total_stress(&mut &mut self.update_edge_list) {
                     // if an edge cracked, add triangles to triangle update list
                     if let Some(l) = triangle_update_list.as_mut() {
                         let a_edges = Edge::get_adjacent_edges(e.index, self.cols);
@@ -223,12 +220,6 @@ impl Graph {
                                             } else {
                                                 e2.nodes[0]
                                             };
-
-                                            let test = [self.node_matrix.get(ns[0]).ndc.expect("shouldn't be none"),
-                                            self.node_matrix.get(ns[1]).ndc.expect("shouldn't be none"),
-                                            self.node_matrix.get(ns[2]).ndc.expect("shouldn't be none")];
-
-                                            //println!("triangle: {:?}", test);
     
                                             for i in 0..3 {
                                                 l.push(self.node_matrix.get(ns[i]).ndc.expect("shouldn't be none"));
@@ -290,13 +281,11 @@ impl Graph {
                 for i in 0..4 {
                     if let Some(e) = adjacent_edges[i] {
                         if let Some(ee) = self.edge_matrix.get(e) {
-                            //println!("EDGE {} has stress: {}", i, ee.stress);
-                            prop_amounts[i] = Some(ee.stress);
-                            // ee.add_stress_update(3_f32.sqrt() / 2.0 * added_stress * PROPOGATION_CONST, dir);
-                            // if ee.get_update_status() != EdgeUpdateStatus::StressUpdate {
-                            //     ee.set_scheduled_for_stress_update();
-                            //     self.update_edge_list.push(ee.index);
-                            // }
+                            if ee.cracked {
+                                prop_amounts[i] = Some(CRACKED_STRESS_REP);
+                            } else {
+                                prop_amounts[i] = Some(ee.stress);
+                            }
                         }
                     }
                 }
@@ -352,7 +341,12 @@ impl Graph {
                 for i in 0..4 {
                     if let Some(e) = adjacent_edges[i] {
                         if let Some(ee) = self.edge_matrix.get_mut(e) {
-                            let amt = (ee.ty_to_prop_vec() * dir) * inversions[i];
+                            let amt = (ee.ty_to_prop_vec() * dir) * inversions[i]
+                                * if ee.cracked {
+                                    CRACKED_STRESS_REP
+                                } else {
+                                    1.0
+                                };
                             if amt > 0_f32 {
                                 //println!("added edge {:?} with amt: {}", ee.index, amt);
                                 pre_prop_ratio[a] = (amt.max(MIN_STRESS), Some(e));
@@ -401,6 +395,8 @@ impl Graph {
         true
     }
 
+    /// Used for testing purposes
+    #[allow(unused)]
     pub fn main_loop(&mut self) {
         self.update_graph_edge_stresses(None);
         debug_assert!(self.valid_edge_assert_not(EdgeUpdateStatus::StressUpdate));
@@ -414,6 +410,7 @@ impl Graph {
      \ / \ / \
       o---o---o
     */
+    #[allow(unused)]
     pub fn debug_print(&self, file: Option<&Path>) {
         let mut output = String::new();
         for r in 0..self.rows {
@@ -494,7 +491,6 @@ impl EdgeMatrix {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::prelude::*;
     use std::time;
 
     #[test]

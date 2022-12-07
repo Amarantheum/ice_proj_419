@@ -1,8 +1,4 @@
-use std::collections::VecDeque;
-
-use super::{node::{Node, NodeIndex}, NodeMatrix, edge_update_list::EdgeUpdateList, EdgeMatrix, propagation_vector::PVec};
-use super::stress_vec::StressVec;
-use crate::graphics::vertex::Vertex;
+use super::{node::NodeIndex, NodeMatrix, edge_update_list::EdgeUpdateList, propagation_vector::PVec};
 use super::CRACK_THRESHOLD;
 use super::DIR_PROPAGATION;
 
@@ -111,7 +107,7 @@ impl Edge {
     }
 
     #[inline]
-    pub(super) fn update_total_stress(&mut self, matrix: &mut NodeMatrix, update_list: &mut EdgeUpdateList) -> bool {
+    pub(super) fn update_total_stress(&mut self, update_list: &mut EdgeUpdateList) -> bool {
         if self.cracked {
             debug_assert!(self.stress == 0_f32);
             if self.stress_update != 0_f32 {

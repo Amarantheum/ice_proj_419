@@ -1,9 +1,7 @@
-use std::collections::{HashSet, VecDeque};
+use std::collections::HashSet;
 
-use super::edge_update_list::EdgeUpdateList;
 use super::{NodeMatrix, EdgeMatrix};
-use super::stress_vec::StressVec;
-use super::edge::{Edge, EdgeIndex, EdgeUpdateStatus};
+use super::edge::EdgeIndex;
 use crate::graphics::vertex::Vertex;
 
 #[derive(Copy, Clone, PartialEq, Debug, Default)]
@@ -31,6 +29,7 @@ pub struct Node {
     pub ndc: Option<Vertex>,
 }
 
+#[allow(unused)]
 impl Node {
     pub(super) fn new(row: usize, col: usize) -> Self {
         Self {
@@ -93,8 +92,6 @@ impl Node {
             }
             req_edges.remove(&0);
         }
-
-        //println!("index: {:?}, required_edges: {:?}", index, req_edges);
 
         for e in req_edges {
             let edge = e_matrix.get(self.edges[e].expect("edge shouldn't be None")).expect("edge shouldn't be None");

@@ -7,6 +7,7 @@ pub struct PVec {
     v: [f32; 2],
 }
 
+#[allow(unused)]
 impl PVec {
     #[inline]
     pub fn new(x: f32, y: f32) -> Self {

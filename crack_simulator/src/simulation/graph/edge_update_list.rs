@@ -1,7 +1,5 @@
 use std::collections::VecDeque;
-use super::{EdgeIndex, EdgeMatrix};
-use super::Edge;
-use std::iter::IntoIterator;
+use super::EdgeIndex;
 
 pub struct EdgeUpdateList {
     pub v: VecDeque<EdgeIndex>
