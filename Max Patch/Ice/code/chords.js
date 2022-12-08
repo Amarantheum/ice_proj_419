@@ -11,7 +11,6 @@ setoutletassist(5, "returns count number")
 setoutletassist(6, "return total chord number");
 
 var count = 0;
-var initialized = 0;
 
 // make them longer at the beginning
 var chordArr = [
@@ -67,7 +66,6 @@ var chordArr = [
 function bang() {
 	// iterate through outlets as resonators can only play one chord
 	// at any time
-	if (!initialized) { return; }
 	outlet(count % 5, chordArr[count]);
 	count++;
 	// just keeping this here for testing so i don't have to reset
@@ -78,8 +76,12 @@ function bang() {
 	outlet(5, count);
 }
 
-function init() {
+function msg_float(intensity) {
+	// float input 1.0 to 2.0
+	iMod = intensity;
+}
+
+function countMsg() {
 	// output number of chords in array
-	initialized = 1;
 	outlet(6, chordArr.length);
 }
