@@ -1,5 +1,5 @@
 inlets = 1;
-outlets = 7;
+outlets = 12;
 
 setinletassist(0, "bang input");
 setoutletassist(0, "returns next chord in sequence");
@@ -7,8 +7,13 @@ setoutletassist(1, "returns next chord in sequence");
 setoutletassist(2, "returns next chord in sequence");
 setoutletassist(3, "returns next chord in sequence");
 setoutletassist(4, "returns next chord in sequence");
-setoutletassist(5, "returns count number")
-setoutletassist(6, "return total chord number");
+setoutletassist(5, "returns next chord in sequence");
+setoutletassist(6, "returns next chord in sequence");
+setoutletassist(7, "returns next chord in sequence");
+setoutletassist(8, "returns next chord in sequence");
+setoutletassist(9, "returns next chord in sequence");
+setoutletassist(10, "returns count number");
+setoutletassist(11, "return total chord number");
 
 var count = 0;
 var initialized = 0;
@@ -74,30 +79,37 @@ var chordArr = [
 function bang() {
 	if (!initialized) { return; }
 	// stop if at last chord
-	if (count > chordArr.length) {
+	/*if (count > chordArr.length) {
 		outlet(count % 5, [0, 0, 0]);
 		count++;
 		return;
-	}
+	}*/
 	// iterate through outlets as resonators can only play one chord
 	// at any time
-	outlet(count % 5, chordArr[count]);
+	if (count > 30) {
+  		for (i = 0; i < chordArr[count].length; i++) {
+        	if (i % 3 == 0) {
+            	chordArr[count][i] = chordArr[count][i] + (Math.floor((Math.random() * 10) + 1) * 220);
+        	}
+    	}
+	}
+	outlet(count % 10, chordArr[count]);
 	count++;
 	// uncomment to loop chords for testing
 	if (count > chordArr.length) {
 		count = 45;
 	}
-	outlet(5, count);
+	outlet(10, count);
 }
 
 function init() {
 	// output number of chords in array
 	initialized = 1;
-	outlet(6, chordArr.length);
+	outlet(11, chordArr.length);
 }
 
 function reset() {
 	// reset chords
 	count = 0;
-	outlet(5, count);
+	outlet(10, count);
 }
