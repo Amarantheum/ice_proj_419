@@ -1,5 +1,5 @@
-use std::{sync::{Arc, Mutex}, collections::VecDeque, error::Error};
-use rosc::{encoder, OscType, OscMessage, OscPacket};
+use std::{sync::{Arc, Mutex}, collections::VecDeque, error::Error, time::Duration};
+use rosc::{encoder, OscType, OscMessage, OscPacket, OscArray};
 use std::net::{SocketAddrV4, Ipv4Addr, UdpSocket};
 use std::fs::File;
 use std::io::prelude::*;
@@ -80,7 +80,7 @@ pub fn read_watch_task(crack_update_buf: Arc<Mutex<VecDeque<f32>>>, stop: Arc<Mu
                         }
                         moving_avg /= MOVING_AVG_SIZE as f32;
                         
-                        if moving_avg > 500.0  && time.elapsed().as_secs_f32() > 0.5 {
+                        if moving_avg > 500.0  && time.elapsed().as_secs_f32() > 2.0 {
                             crack_update_buf.lock().unwrap().push_back(moving_avg);
                             time = std::time::Instant::now();
 
@@ -88,11 +88,20 @@ pub fn read_watch_task(crack_update_buf: Arc<Mutex<VecDeque<f32>>>, stop: Arc<Mu
                                 
                                 addr: "/crack".to_string(),
                                 args: vec![
-                                    OscType::Float(moving_avg)
+                                    OscType::Float(moving_avg),
+                                    // OscType::Array(
+                                    //     OscArray { content: vec![0,] }
+                                    // )
                                 ],
                             }))
                             .unwrap();
-                            watch_socket.send_to(&msg_buf, &audio_target).unwrap();
+                            
+                            for i in 0..5 {
+                                watch_socket.send_to(&msg_buf, &audio_target).unwrap();
+                                std::thread::sleep(Duration::from_millis(300));
+                            }
+                            
+                            
                         }
                     }
                 }

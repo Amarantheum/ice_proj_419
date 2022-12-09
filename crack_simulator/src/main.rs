@@ -1,6 +1,6 @@
 use graphics::SimulationScreen;
 use osc::read_watch_task;
-use std::{sync::{Arc, Mutex}, collections::VecDeque, process::exit};
+use std::{sync::{Arc, Mutex}, collections::VecDeque};
 use std::io;
 use std::str::FromStr;
 
@@ -43,7 +43,6 @@ fn main() {
         }
         println!("stopping simulation...");
         *stop.lock().unwrap() = true;
-        exit(0);
     });
 
     // run simulation

@@ -158,7 +158,7 @@ impl SimulationScreen {
                     let mut frame_buf = SimpleFrameBuffer::new(&self.display, &self.bloom_texture)
                         .expect("failed to create frame buffer");
 
-                    frame_buf.draw(&default_vbo, &indices, &self.bloom_shader_program, &uniform! {crack_texture: &self.crack_texture, scale: 2_f32 * 1920_f32}, &Default::default())
+                    frame_buf.draw(&default_vbo, &indices, &self.bloom_shader_program, &uniform! {crack_texture: &self.crack_texture, scale: 1920_f32}, &Default::default())
                         .expect("failed to draw frame");
                 }
 
