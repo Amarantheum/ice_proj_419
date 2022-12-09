@@ -464,7 +464,12 @@ impl Graph {
     }
 
     pub fn get_random_edge_index(&self) -> EdgeIndex {
-        EdgeIndex { row: (random::<usize>() % self.rows + 1) - 2, col: (random::<usize>() % self.cols + 1) - 2, ty: random::<usize>() % 3 }
+        let att = EdgeIndex { row: (random::<usize>() % (self.rows - 2)) + 1, col: (random::<usize>() % (self.cols - 2)) + 1, ty: random::<usize>() % 3 };
+        if self.edge_matrix.get(att).expect("shouldn't be none").cracked {
+            self.get_random_edge_index()
+        } else {
+            att
+        }
     }
 }
 

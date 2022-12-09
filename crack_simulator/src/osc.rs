@@ -1,17 +1,27 @@
 use std::{sync::{Arc, Mutex}, collections::VecDeque, error::Error, time::Duration};
-use rosc::{encoder, OscType, OscMessage, OscPacket, OscArray};
+use rosc::{encoder, OscType, OscMessage, OscPacket};
 use std::net::{SocketAddrV4, Ipv4Addr, UdpSocket};
 use std::fs::File;
 use std::io::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use rand::random;
+
+use crate::REPEAT_AMT;
 
 #[derive(Serialize, Deserialize)]
 struct IpSettings {
     audio_ip: String,
     audio_port: u16,
-    watch_ip: String,
+    src_ip: String,
     watch_port: u16,
+    src_port: u16,
+}
+
+pub struct CrackNotifier {
+    audio_target: SocketAddrV4,
+    udp_socket: UdpSocket,
+    update_buf: Arc<Mutex<VecDeque<f32>>>,
 }
 
 fn read_settings() -> Result<IpSettings, Box<dyn Error>> {
@@ -22,30 +32,106 @@ fn read_settings() -> Result<IpSettings, Box<dyn Error>> {
     Ok(settings)
 }
 
-pub fn read_watch_task(crack_update_buf: Arc<Mutex<VecDeque<f32>>>, stop: Arc<Mutex<bool>>) {
+
+impl CrackNotifier {
+    #[inline]
+    pub fn new(update_buf: Arc<Mutex<VecDeque<f32>>>) -> Result<Self, Box<dyn Error>> {
+        let settings = read_settings()?;
+        let audio_target = SocketAddrV4::new(
+            Ipv4Addr::from_str(settings.audio_ip.as_str())
+                .expect("failed to parse audio_ip as an ipv4 address"),
+            settings.audio_port
+        );
+
+        let crack_src = SocketAddrV4::new(
+            Ipv4Addr::from_str(settings.src_ip.as_str())
+                .expect("failed to parse audio_ip as an ipv4 address"),
+            settings.src_port
+        );
+        let udp_socket = UdpSocket::bind(crack_src)?;
+
+        Ok(
+            Self {
+                audio_target,
+                udp_socket,
+                update_buf,
+            }
+        )
+    }
+
+    #[inline]
+    pub fn notify(&self, buf: Option<&Vec<u8>>, crack_value: Option<f32>) {
+        if let Some(v) = buf {
+            self.udp_socket.send_to(v, &self.audio_target)
+                .unwrap();
+        }
+    
+        if let Some(v) = crack_value {
+            self.update_buf.lock()
+                .unwrap()
+                .push_back(v);
+        }
+    }
+
+    #[inline]
+    pub fn send_crack(&self, crack_value: f32) {
+        let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
+            addr: "/crack".to_string(),
+            args: vec![
+                OscType::Float(crack_value),
+            ],
+        }))
+        .unwrap();
+    
+        self.notify(Some(&msg_buf), Some(crack_value));
+
+        
+    }
+
+    pub fn send_cloned_crack(notifier: &Arc<Mutex<Self>>, crack_value: f32) {
+        let not_ref = notifier.lock().unwrap();
+        not_ref.send_crack(crack_value);
+        drop(not_ref);
+
+        if *REPEAT_AMT.read().unwrap() > 0 {
+            let cloned = Arc::clone(&notifier);
+            std::thread::spawn(move || {
+                for _ in 0..*REPEAT_AMT.read().unwrap() {
+                    std::thread::sleep(Duration::from_millis(random::<u64>() % 500 + 100));
+                    let not_ref = cloned.lock().unwrap();
+                    not_ref.send_crack((crack_value + (random::<f32>() * 200_f32 - 100_f32)).max(500_f32).min(1000_f32));
+                    drop(not_ref);
+                }
+            });
+        }
+    }
+}
+
+
+pub fn read_watch_task(notifier: Arc<Mutex<CrackNotifier>>, stop: Arc<Mutex<bool>>) {
     // initialize sockets
     const MOVING_AVG_SIZE: usize = 4;
+
     let settings = read_settings()
-        .expect("failed to read settingsg file");
-    let audio_target = SocketAddrV4::new(
-        Ipv4Addr::from_str(settings.audio_ip.as_str())
-            .expect("failed to parse audio_ip as an ipv4 address"),
-        settings.audio_port
-    );
+        .expect("failed to read settings file");
     let watch_src = SocketAddrV4::new(
-        Ipv4Addr::from_str(settings.watch_ip.as_str())
+        Ipv4Addr::from_str(settings.src_ip.as_str())
             .expect("failed to parse audio_ip as an ipv4 address"),
         settings.watch_port
     );
+
     let watch_socket = UdpSocket::bind(watch_src)
         .expect(format!("failed to bined to socket {:?}", watch_src).as_str());
-
+    
     let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {                     
         addr: "/start".to_string(),
         args: vec![],
     }))
     .unwrap();
-    watch_socket.send_to(&msg_buf, &audio_target).unwrap();
+    
+    let not_ref = notifier.lock().unwrap();
+    not_ref.notify(Some(&msg_buf), None);
+    drop(not_ref);
 
     // spawn task
     std::thread::spawn(move || {
@@ -66,10 +152,9 @@ pub fn read_watch_task(crack_update_buf: Arc<Mutex<VecDeque<f32>>>, stop: Arc<Mu
                             ],
                         }))
                         .unwrap();
-                        watch_socket.send_to(&msg_buf, &audio_target).unwrap();
+                        notifier.lock().unwrap().notify(Some(&msg_buf), None);
                         break;
                     }
-                    //println!("Received packet with size {} from: {}", size, addr);
                     let (_, packet) = rosc::decoder::decode_udp(&buf[..size]).unwrap();
                     if let Ok(v) = handle_packet(packet) {
                         moving_avg_buf.pop_front();
@@ -81,27 +166,8 @@ pub fn read_watch_task(crack_update_buf: Arc<Mutex<VecDeque<f32>>>, stop: Arc<Mu
                         moving_avg /= MOVING_AVG_SIZE as f32;
                         
                         if moving_avg > 500.0  && time.elapsed().as_secs_f32() > 2.0 {
-                            crack_update_buf.lock().unwrap().push_back(moving_avg);
                             time = std::time::Instant::now();
-
-                            let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
-                                
-                                addr: "/crack".to_string(),
-                                args: vec![
-                                    OscType::Float(moving_avg),
-                                    // OscType::Array(
-                                    //     OscArray { content: vec![0,] }
-                                    // )
-                                ],
-                            }))
-                            .unwrap();
-                            
-                            for i in 0..5 {
-                                watch_socket.send_to(&msg_buf, &audio_target).unwrap();
-                                std::thread::sleep(Duration::from_millis(300));
-                            }
-                            
-                            
+                            CrackNotifier::send_cloned_crack(&notifier, moving_avg);
                         }
                     }
                 }

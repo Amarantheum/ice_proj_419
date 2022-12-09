@@ -11,6 +11,7 @@ use glium::{Display, Surface, Program, VertexBuffer};
 use glium::uniform;
 use vertex::Vertex;
 
+use crate::NUM_CRACKS;
 use crate::simulation::graph::Graph;
 
 pub mod vertex;
@@ -132,9 +133,9 @@ impl SimulationScreen {
                 println!("post: {}", post);
                 self.graph.add_stress(self.graph.get_random_edge_index(), post).unwrap();
 
-                if self.count < 47 {
-                    self.crack_color[0] -= 0.5 / 47_f32;
-                    self.crack_color[1] -= 1.0 / 47_f32;
+                if self.count < *NUM_CRACKS {
+                    self.crack_color[0] -= 0.5 / *NUM_CRACKS as f32;
+                    self.crack_color[1] -= 1.0 / *NUM_CRACKS as f32;
                 }
                 self.count += 1;
                 println!("color: {:?}", self.crack_color);
