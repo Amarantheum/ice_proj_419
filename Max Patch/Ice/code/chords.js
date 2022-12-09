@@ -1,5 +1,5 @@
 inlets = 1;
-outlets = 7;
+outlets = 12;
 
 setinletassist(0, "bang input");
 setoutletassist(0, "returns next chord in sequence");
@@ -7,13 +7,17 @@ setoutletassist(1, "returns next chord in sequence");
 setoutletassist(2, "returns next chord in sequence");
 setoutletassist(3, "returns next chord in sequence");
 setoutletassist(4, "returns next chord in sequence");
-setoutletassist(5, "returns count number")
-setoutletassist(6, "return total chord number");
+setoutletassist(5, "returns next chord in sequence");
+setoutletassist(6, "returns next chord in sequence");
+setoutletassist(7, "returns next chord in sequence");
+setoutletassist(8, "returns next chord in sequence");
+setoutletassist(9, "returns next chord in sequence");
+setoutletassist(10, "returns count number");
+setoutletassist(11, "return total chord number");
 
 var count = 0;
 var initialized = 0;
 
-// make them longer at the beginning
 var chordArr = [
 	[880, 0.5, 1., 1320, 0.5, 0.9, 1650, 0.9, 1.5, 2200, 1.8, 1.4, 1980, 0.5, 2.3],		// A
 	[660, 0.5, 0.8, 990, 0.5, 1.2, 1110, 0.8, 1.3, 1480, 0.8, 1.4, 1160, 0.8, 1.3],		// E
@@ -62,24 +66,50 @@ var chordArr = [
 	[440, 0.5, 0.5, 523, 0.5, 0.5, 554, 0.5, 1.5, 1244, 0.5, 1.4, 622, 0.5, 1.3],
 	[660, 0.5, 0.5, 680, 0.5, 0.5, 670, 0.5, 1.5, 2420, 0.5, 1.4, 1210, 0.5, 1.3],
 	[990, 0.5, 0.6, 1480, 0.5, 1.3, 995, 1.1, 0.9, 1000, 0.8, 1.1, 1510, 0.7, 1.2],
+	[454, 0.5, 0.6, 455, 0.8, 1.1, 456, 1.1, 0.9, 1212, 0.8, 1.2, 1215, 0.7, 1.1, 1216, 0.7, 1.1, 1217, 0.7, 1.1],
+	[460, 0.5, 0.6, 459, 0.8, 1.1, 458, 1.1, 0.9, 1092, 0.8, 1.2, 1095, 0.7, 1.1, 1096, 0.7, 1.1, 1097, 0.7, 1.1],
+	[466, 0.5, 0.6, 465, 0.8, 1.1, 467, 1.1, 0.9, 468, 0.8, 1.2, 1085, 0.7, 1.1, 1086, 0.7, 1.1, 1087, 0.7, 1.1],
+	[474, 0.5, 0.6, 485, 0.8, 1.1, 486, 1.1, 0.9, 484, 0.8, 1.2, 1520, 0.7, 1.3, 1522, 0.7, 1.3, 1524, 0.7, 1.4],
+	[480, 0.5, 0.6, 485, 0.8, 1.1, 484, 1.1, 0.9, 494, 0.8, 1.2, 1720, 0.7, 1.5, 1722, 0.7, 1.5, 1724, 0.7, 1.5],
+	[484, 0.5, 0.6, 495, 0.8, 1.1, 496, 1.1, 0.9, 494, 0.8, 1.2, 1820, 0.7, 1.1, 1822, 0.7, 1.1, 1824, 0.7, 1.1],
+	[488, 0.5, 0.6, 498, 0.8, 1.1, 497, 1.1, 0.9, 500, 0.8, 1.2, 1920, 0.7, 1.1, 1922, 0.7, 1.1, 1924, 0.7, 1.1],
+	[1760, 0.3, 0.2],
 ];
 
 function bang() {
+	if (!initialized) { return; }
+	// stop if at last chord
+	/*if (count > chordArr.length) {
+		outlet(count % 5, [0, 0, 0]);
+		count++;
+		return;
+	}*/
 	// iterate through outlets as resonators can only play one chord
 	// at any time
-	if (!initialized) { return; }
-	outlet(count % 5, chordArr[count]);
-	count++;
-	// just keeping this here for testing so i don't have to reset
-	// the patch constantly
-	if (count > chordArr.length) {
-		count = 0;
+	if (count > 30) {
+  		for (i = 0; i < chordArr[count].length; i++) {
+        	if (i % 3 == 0) {
+            	chordArr[count][i] = chordArr[count][i] + (Math.floor((Math.random() * 10) + 1) * 220);
+        	}
+    	}
 	}
-	outlet(5, count);
+	outlet(count % 10, chordArr[count]);
+	count++;
+	// uncomment to loop chords for testing
+	if (count > chordArr.length) {
+		count = 45;
+	}
+	outlet(10, count);
 }
 
 function init() {
 	// output number of chords in array
 	initialized = 1;
-	outlet(6, chordArr.length);
+	outlet(11, chordArr.length);
+}
+
+function reset() {
+	// reset chords
+	count = 0;
+	outlet(10, count);
 }
