@@ -104,9 +104,11 @@ function bang() {
 	if (randomize) {
   		for (i = 0; i < chordArr[count].length; i++) {
         	if (i % 3 == 0) {
-				if (Math.floor(Math.random() * 2) == 0) { chordArr[count][i] = chordArr[count][i] - (Math.floor((Math.random() * 10)) * 220); }
+				if (Math.floor(Math.random() * 2) == 0) {
+					chordArr[count][i] = chordArr[count][i] - (Math.floor((Math.random() * 5)) * 110);
+					if (chordArr[count][i] < 0) { chordArr[count][i] = 100 + (i * 10); }
+				}
 				else { chordArr[count][i] = chordArr[count][i] + (Math.floor((Math.random() * 10)) * 220); }
-            	
         	}
     	}
 	}
