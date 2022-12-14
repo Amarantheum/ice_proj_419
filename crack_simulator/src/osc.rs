@@ -6,6 +6,7 @@ use std::io::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use rand::random;
+use colored::Colorize;
 
 use crate::REPEAT_AMT;
 
@@ -97,7 +98,7 @@ impl CrackNotifier {
             let cloned = Arc::clone(&notifier);
             std::thread::spawn(move || {
                 for _ in 0..*REPEAT_AMT.read().unwrap() {
-                    std::thread::sleep(Duration::from_millis(random::<u64>() % 500 + 100));
+                    std::thread::sleep(Duration::from_millis(random::<u64>() % 500 + 300));
                     let not_ref = cloned.lock().unwrap();
                     not_ref.send_crack((crack_value + (random::<f32>() * 200_f32 - 100_f32)).max(500_f32).min(1000_f32));
                     drop(not_ref);
@@ -108,7 +109,7 @@ impl CrackNotifier {
 }
 
 
-pub fn read_watch_task(notifier: Arc<Mutex<CrackNotifier>>, stop: Arc<Mutex<bool>>) {
+pub fn read_watch_task(notifier: Arc<Mutex<CrackNotifier>>) {
     // initialize sockets
     const MOVING_AVG_SIZE: usize = 4;
 
@@ -142,19 +143,6 @@ pub fn read_watch_task(notifier: Arc<Mutex<CrackNotifier>>, stop: Arc<Mutex<bool
         loop {
             match watch_socket.recv_from(&mut buf) {
                 Ok((size, _addr)) => {
-                    if *stop.lock().unwrap() {
-                        println!("stopping");
-                        let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
-                                
-                            addr: "/stop".to_string(),
-                            args: vec![
-                                OscType::Int(0),
-                            ],
-                        }))
-                        .unwrap();
-                        notifier.lock().unwrap().notify(Some(&msg_buf), None);
-                        break;
-                    }
                     let (_, packet) = rosc::decoder::decode_udp(&buf[..size]).unwrap();
                     if let Ok(v) = handle_packet(packet) {
                         moving_avg_buf.pop_front();
@@ -203,4 +191,44 @@ fn handle_packet<'a>(packet: OscPacket) -> Result<f32, &'a str> {
         }
         _ => Err("Did not get expected packet type")
     }
+}
+
+pub fn time_controller(crack_notifier: Arc<Mutex<CrackNotifier>>) {
+    for i in 0..=24 {
+        match i {
+            0..=10 | 13..=16 | 19..=22 => (),
+            11 | 17 | 23 => {
+                let string = format!("WARN: {}", i * 10).white().on_magenta().bold();
+                println!("{}", string);
+            }
+            12 => *REPEAT_AMT.write().unwrap() = 1,
+            18 => *REPEAT_AMT.write().unwrap() = 2,
+            24 => {
+                *REPEAT_AMT.write().unwrap() = 4;
+                let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {        
+                    addr: "/four".to_string(),
+                    args: vec![],
+                }))
+                .unwrap();
+                crack_notifier.lock().unwrap().notify(Some(&msg_buf), None)
+            },
+            _ => unreachable!(),
+        }
+        let string = format!("TIME: {}", i * 10).green().bold();
+        println!("{}", string);
+        std::thread::sleep(std::time::Duration::from_secs(10));
+    }
+}
+
+pub fn stop(crack_notifier: Arc<Mutex<CrackNotifier>>) {
+    println!("sending /stop");
+    let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
+            
+        addr: "/stop".to_string(),
+        args: vec![
+            OscType::Int(0),
+        ],
+    }))
+    .unwrap();
+    crack_notifier.lock().unwrap().notify(Some(&msg_buf), Some(-1_f32));
 }

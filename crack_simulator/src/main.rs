@@ -7,7 +7,7 @@ use std::str::FromStr;
 use std::time::Instant;
 use rand::random;
 
-use crate::osc::CrackNotifier;
+use crate::osc::{CrackNotifier, time_controller};
 
 mod simulation;
 mod graphics;
@@ -16,7 +16,7 @@ mod osc;
 lazy_static!{
     static ref REPEAT_AMT: RwLock<usize> = RwLock::new(0);
     static ref TIMER: RwLock<Instant> = RwLock::new(Instant::now());
-    static ref NUM_CRACKS: usize = 47;
+    static ref TOTAL_TIME: usize = 60 * 4;
 }
 
 fn main() {
@@ -33,16 +33,20 @@ fn main() {
                 println!("err reading line: {:?}", e);
             }
         }
-        let stop: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
-        let stop_tmp = Arc::clone(&stop);
         let crack_notifier = Arc::new(Mutex::new(CrackNotifier::new(Arc::clone(&crack_update_buf))
             .expect("failed to create crack_notifier")));
-        let crack_notifier_tmp = Arc::clone(&crack_notifier);
         let mut t = (*TIMER).write().unwrap();
         *t = Instant::now();
         drop(t);
+
+        let crack_notifier_tmp = Arc::clone(&crack_notifier);
         std::thread::spawn(move || {
-            read_watch_task(crack_notifier_tmp, Arc::clone(&stop_tmp));
+            time_controller(crack_notifier_tmp);
+        });
+
+        let crack_notifier_tmp = Arc::clone(&crack_notifier);
+        std::thread::spawn(move || {
+            read_watch_task(crack_notifier_tmp);
         });
         input = String::new();
         while input.trim() != "stop" {
@@ -57,7 +61,7 @@ fn main() {
             }
         }
         println!("stopping simulation...");
-        *stop.lock().unwrap() = true;
+        osc::stop(crack_notifier);
     });
 
     // run simulation
